@@ -23,9 +23,10 @@ async function verifyAuth(request: Request): Promise<boolean> {
 // GET - Ottieni singola prenotazione
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const isAuthenticated = await verifyAuth(request)
     if (!isAuthenticated) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
@@ -33,7 +34,7 @@ export async function GET(
 
     const result = await query(
       `SELECT * FROM bookings WHERE id = $1`,
-      [params.id]
+      [id]
     )
 
     if (result.rows.length === 0) {
@@ -53,9 +54,10 @@ export async function GET(
 // DELETE - Elimina prenotazione
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const isAuthenticated = await verifyAuth(request)
     if (!isAuthenticated) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
@@ -63,7 +65,7 @@ export async function DELETE(
 
     const result = await query(
       `DELETE FROM bookings WHERE id = $1 RETURNING *`,
-      [params.id]
+      [id]
     )
 
     if (result.rows.length === 0) {
@@ -83,9 +85,10 @@ export async function DELETE(
 // PUT - Modifica prenotazione
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const isAuthenticated = await verifyAuth(request)
     if (!isAuthenticated) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
@@ -118,7 +121,7 @@ export async function PUT(
         data.total_amount,
         data.payment_status,
         data.special_requests,
-        params.id,
+        id,
       ]
     )
 

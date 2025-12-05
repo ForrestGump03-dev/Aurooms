@@ -46,7 +46,7 @@ A modern, full-stack booking platform built for AuRooms Guest House in Cinisi, S
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/ForrestGump03-dev/Aurooms_Claude.git
+   git clone https://github.com/ForrestGump03-dev/Aurooms.git
    cd aurooms
    ```
 
@@ -56,10 +56,8 @@ A modern, full-stack booking platform built for AuRooms Guest House in Cinisi, S
    ```
 
 3. **Environment Setup**
-   Copy `.env.example` to `.env.development` and configure your keys:
-   ```bash
-   cp .env.example .env.development
-   ```
+
+Create a `.env` file in the root directory and add the following variables:
 
    **Required Variables:**
    ```env

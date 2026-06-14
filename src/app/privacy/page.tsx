@@ -84,7 +84,7 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li><strong>Payment Processor:</strong> Stripe Inc. for secure payment processing (GDPR compliant)</li>
-              <li><strong>Email Service:</strong> Resend for sending booking confirmations (GDPR compliant)</li>
+              <li><strong>Email Service:</strong> Brevo for sending transactional booking emails (GDPR compliant)</li>
               <li><strong>Database Provider:</strong> Neon Database for secure data storage (GDPR compliant, EU servers)</li>
               <li><strong>Legal Authorities:</strong> When required by Italian law or legal process</li>
             </ul>

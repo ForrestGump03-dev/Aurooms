@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { query } from '@/lib/db'
-import { sendBookingConfirmation } from '@/lib/email'
+import { enqueueBookingEmail, processEmailQueue } from '@/lib/email'
+import { sendNewBookingNotification } from '@/lib/push'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
     }
 
-    const event = stripe.webhooks.constructEvent(
+    const event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET
@@ -21,23 +22,19 @@ export async function POST(request: NextRequest) {
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object
 
-      // Update booking status
-      await query(
-        'UPDATE bookings SET payment_status = $1, updated_at = CURRENT_TIMESTAMP WHERE stripe_payment_intent_id = $2',
-        ['confirmed', paymentIntent.id]
-      )
-
-      // Get booking details for email
       const result = await query(
-        'SELECT * FROM bookings WHERE stripe_payment_intent_id = $1',
-        [paymentIntent.id]
+        `UPDATE bookings
+         SET payment_status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE stripe_payment_intent_id = $2
+           AND payment_status <> $1
+         RETURNING *`,
+        ['confirmed', paymentIntent.id]
       )
 
       if (result.rows.length > 0) {
         const booking = result.rows[0]
-        
-        // Send confirmation email
-        await sendBookingConfirmation({
+        const bookingEmail = {
+          bookingId: booking.id,
           bookingNumber: booking.booking_number,
           guestName: booking.guest_name,
           guestEmail: booking.guest_email,
@@ -47,7 +44,64 @@ export async function POST(request: NextRequest) {
           guestsCount: booking.guests_count,
           totalAmount: booking.total_amount,
           specialRequests: booking.special_requests,
-        })
+        }
+
+        try {
+          await enqueueBookingEmail(bookingEmail, 'payment_completed')
+          await processEmailQueue(3)
+        } catch (emailError) {
+          console.error('Email queue error after payment confirmation:', emailError)
+        }
+
+        try {
+          await sendNewBookingNotification({
+            bookingId: booking.id,
+            bookingNumber: booking.booking_number,
+            guestName: booking.guest_name,
+            roomType: booking.room_type,
+            checkIn: booking.check_in,
+            checkOut: booking.check_out,
+            totalAmount: Number(booking.total_amount),
+          })
+        } catch (pushError) {
+          console.error('Push notification error after payment confirmation:', pushError)
+        }
+      }
+    } else if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object
+
+      const result = await query(
+        `UPDATE bookings
+         SET payment_status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE stripe_payment_intent_id = $2
+           AND payment_status <> $1
+         RETURNING *`,
+        ['failed', paymentIntent.id]
+      )
+
+      if (result.rows.length > 0) {
+        const booking = result.rows[0]
+
+        try {
+          await enqueueBookingEmail(
+            {
+              bookingId: booking.id,
+              bookingNumber: booking.booking_number,
+              guestName: booking.guest_name,
+              guestEmail: booking.guest_email,
+              checkIn: booking.check_in,
+              checkOut: booking.check_out,
+              roomType: booking.room_type,
+              guestsCount: booking.guests_count,
+              totalAmount: booking.total_amount,
+              specialRequests: booking.special_requests,
+            },
+            'payment_failed'
+          )
+          await processEmailQueue(3)
+        } catch (emailError) {
+          console.error('Email queue error after payment failure:', emailError)
+        }
       }
     }
 

@@ -9,7 +9,7 @@ A modern, full-stack booking platform built for AuRooms Guest House in Cinisi, S
 ### 🏨 Guest Experience
 - **Real-time Availability**: Instant checks for room availability.
 - **Secure Payments**: Integrated Stripe checkout for safe transactions.
-- **Automated Emails**: Instant booking confirmations via Resend.
+- **Automated Emails**: Transactional booking emails via Brevo with a lightweight PostgreSQL queue.
 - **Responsive Design**: Optimized for mobile, tablet, and desktop.
 - **Multi-language Support**: Built with internationalization in mind.
 - **GDPR Compliance**: Granular cookie consent management.
@@ -29,7 +29,7 @@ A modern, full-stack booking platform built for AuRooms Guest House in Cinisi, S
 - **Database**: PostgreSQL (via [Neon](https://neon.tech/))
 - **ORM**: Raw SQL / Custom Helpers
 - **Payments**: Stripe
-- **Email**: Resend
+- **Email**: Brevo Transactional Email API
 - **Notifications**: Web Push API
 - **Deployment**: Vercel
 
@@ -39,7 +39,7 @@ A modern, full-stack booking platform built for AuRooms Guest House in Cinisi, S
 - Node.js 18+
 - PostgreSQL Database
 - Stripe Account
-- Resend Account
+- Brevo Account
 - Vercel Account (for deployment)
 
 ### Installation
@@ -68,8 +68,12 @@ Create a `.env` file in the root directory and add the following variables:
    STRIPE_SECRET_KEY="sk_test_..."
    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 
-   # Resend
-   RESEND_API_KEY="re_..."
+   # Brevo
+   BREVO_API_KEY="xkeysib-..."
+   BREVO_WEBHOOK_SECRET="generate-a-long-random-secret"
+   BREVO_SENDER_EMAIL="prenotazioni@aurooms.it"
+   BREVO_SENDER_NAME="AuRooms"
+   CRON_SECRET="generate-a-long-random-secret"
 
    # Admin Auth
    ADMIN_PASSWORD="YourSecurePassword"
@@ -78,8 +82,16 @@ Create a `.env` file in the root directory and add the following variables:
    # Push Notifications
    NEXT_PUBLIC_VAPID_PUBLIC_KEY="your-public-key"
    VAPID_PRIVATE_KEY="your-private-key"
-   VAPID_SUBJECT="mailto:admin@example.com"
+   VAPID_SUBJECT="mailto:prenotazioni@aurooms.it"
    ```
+
+   In Brevo, authenticate `mail.aurooms.it`, create the sender `AuRooms <prenotazioni@aurooms.it>`, and configure the transactional webhook to:
+
+   ```text
+   https://aurooms.it/api/webhooks/brevo
+   ```
+
+   Send the webhook secret as either `Authorization: Bearer <BREVO_WEBHOOK_SECRET>` or `x-brevo-webhook-secret: <BREVO_WEBHOOK_SECRET>`.
 
 4. **Database Setup**
    ```bash

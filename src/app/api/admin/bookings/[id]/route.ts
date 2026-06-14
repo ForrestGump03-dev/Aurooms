@@ -1,47 +1,35 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
+import { assertSameOrigin, isAdminRequest } from '@/lib/admin-auth'
 import { query } from '@/lib/db'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
-
-// Verifica autenticazione
-async function verifyAuth(request: Request): Promise<boolean> {
-  const token = request.headers.get('cookie')?.match(/admin-token=([^;]+)/)?.[1]
-  
-  if (!token) return false
-
-  try {
-    await jwtVerify(token, JWT_SECRET)
-    return true
-  } catch {
-    return false
-  }
+function parseId(id: string): number | null {
+  const parsed = Number.parseInt(id, 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-// GET - Ottieni singola prenotazione
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const isAuthenticated = await verifyAuth(request)
-    if (!isAuthenticated) {
+    if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
 
-    const result = await query(
-      `SELECT * FROM bookings WHERE id = $1`,
-      [id]
-    )
+    const { id } = await params
+    const bookingId = parseId(id)
+    if (!bookingId) return NextResponse.json({ error: 'ID prenotazione non valido' }, { status: 400 })
+
+    const result = await query('SELECT * FROM bookings WHERE id = $1', [bookingId])
 
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Prenotazione non trovata' }, { status: 404 })
     }
 
-    return NextResponse.json({ booking: result.rows[0] })
+    return NextResponse.json(
+      { booking: result.rows[0] },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('Error fetching booking:', error)
     return NextResponse.json(
@@ -51,22 +39,23 @@ export async function GET(
   }
 }
 
-// DELETE - Elimina prenotazione
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const isAuthenticated = await verifyAuth(request)
-    if (!isAuthenticated) {
+    if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
+    if (!assertSameOrigin(request)) {
+      return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
+    }
 
-    const result = await query(
-      `DELETE FROM bookings WHERE id = $1 RETURNING *`,
-      [id]
-    )
+    const { id } = await params
+    const bookingId = parseId(id)
+    if (!bookingId) return NextResponse.json({ error: 'ID prenotazione non valido' }, { status: 400 })
+
+    const result = await query('DELETE FROM bookings WHERE id = $1 RETURNING *', [bookingId])
 
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Prenotazione non trovata' }, { status: 404 })
@@ -82,17 +71,21 @@ export async function DELETE(
   }
 }
 
-// PUT - Modifica prenotazione
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const isAuthenticated = await verifyAuth(request)
-    if (!isAuthenticated) {
+    if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
+    if (!assertSameOrigin(request)) {
+      return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
+    }
+
+    const { id } = await params
+    const bookingId = parseId(id)
+    if (!bookingId) return NextResponse.json({ error: 'ID prenotazione non valido' }, { status: 400 })
 
     const data = await request.json()
 
@@ -102,26 +95,29 @@ export async function PUT(
         guest_email = $2,
         guest_phone = $3,
         room_type = $4,
-        check_in = $5,
-        check_out = $6,
-        guests_count = $7,
-        total_amount = $8,
-        payment_status = $9,
-        special_requests = $10
-      WHERE id = $11
+        room_id = $5,
+        check_in = $6,
+        check_out = $7,
+        guests_count = $8,
+        total_amount = $9,
+        payment_status = $10,
+        special_requests = $11,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $12
       RETURNING *`,
       [
         data.guest_name,
         data.guest_email,
         data.guest_phone,
         data.room_type,
+        data.room_id || null,
         data.check_in,
         data.check_out,
         data.guests_count,
         data.total_amount,
         data.payment_status,
         data.special_requests,
-        id,
+        bookingId,
       ]
     )
 

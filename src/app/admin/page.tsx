@@ -23,7 +23,7 @@ export default function AdminRedirectPage() {
           // Token non valido o scaduto → vai al login
           router.push('/admin/login')
         }
-      } catch (error) {
+      } catch {
         // Errore di rete → vai al login per sicurezza
         router.push('/admin/login')
       }

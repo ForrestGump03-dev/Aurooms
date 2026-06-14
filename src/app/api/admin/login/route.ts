@@ -1,49 +1,32 @@
 import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
 import { SignJWT } from 'jose'
+import { assertSameOrigin, getAdminPassword, getSigningSecret } from '@/lib/admin-auth'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme'
-
-// Rate limiting semplice (in memoria)
-// Per produzione si potrebbe usare Redis o Vercel KV
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
 const RATE_LIMIT = {
   maxAttempts: 5,
-  windowMs: 15 * 60 * 1000, // 15 minuti
-  blockDurationMs: 60 * 60 * 1000, // 1 ora
+  windowMs: 15 * 60 * 1000,
+  blockDurationMs: 60 * 60 * 1000,
 }
 
 function checkRateLimit(ip: string): { allowed: boolean; remainingAttempts?: number } {
   const now = Date.now()
   const attempts = loginAttempts.get(ip)
 
-  if (!attempts) {
+  if (!attempts || now - attempts.lastAttempt > RATE_LIMIT.windowMs) {
     loginAttempts.set(ip, { count: 1, lastAttempt: now })
     return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - 1 }
   }
 
-  // Reset dopo la finestra temporale
-  if (now - attempts.lastAttempt > RATE_LIMIT.windowMs) {
-    loginAttempts.set(ip, { count: 1, lastAttempt: now })
-    return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - 1 }
-  }
-
-  // Bloccato per troppi tentativi
   if (attempts.count >= RATE_LIMIT.maxAttempts) {
     if (now - attempts.lastAttempt < RATE_LIMIT.blockDurationMs) {
       return { allowed: false }
     }
-    // Reset dopo il blocco
     loginAttempts.set(ip, { count: 1, lastAttempt: now })
     return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - 1 }
   }
 
-  // Incrementa tentativi
   attempts.count++
   attempts.lastAttempt = now
   return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - attempts.count }
@@ -51,12 +34,14 @@ function checkRateLimit(ip: string): { allowed: boolean; remainingAttempts?: num
 
 export async function POST(request: Request) {
   try {
-    // Ottieni IP per rate limiting
-    const ip = request.headers.get('x-forwarded-for') || 
-               request.headers.get('x-real-ip') || 
-               'unknown'
+    if (!assertSameOrigin(request)) {
+      return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
+    }
 
-    // Verifica rate limit
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
+
     const rateLimitCheck = checkRateLimit(ip)
     if (!rateLimitCheck.allowed) {
       return NextResponse.json(
@@ -68,52 +53,40 @@ export async function POST(request: Request) {
     const { password } = await request.json()
 
     if (!password) {
-      return NextResponse.json(
-        { error: 'Password richiesta' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Password richiesta' }, { status: 400 })
     }
 
-    // Verifica password (in produzione usa bcrypt.compare)
-    // Per ora confronto diretto, ma hashato per sicurezza
-    const passwordMatch = password === ADMIN_PASSWORD
-
-    if (!passwordMatch) {
+    if (password !== getAdminPassword()) {
       return NextResponse.json(
-        { 
+        {
           error: 'Password errata',
-          remainingAttempts: rateLimitCheck.remainingAttempts 
+          remainingAttempts: rateLimitCheck.remainingAttempts,
         },
         { status: 401 }
       )
     }
 
-    // Password corretta → genera JWT token
     const token = await new SignJWT({ admin: true })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('24h') // Token valido per 24 ore
-      .sign(JWT_SECRET)
+      .setExpirationTime('24h')
+      .sign(getSigningSecret())
 
-    // Crea response con cookie HTTPOnly
     const response = NextResponse.json({ success: true })
-    
     response.cookies.set('admin-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24, // 24 ore
+      maxAge: 60 * 60 * 24,
       path: '/',
     })
 
-    // Reset tentativi dopo login riuscito
     loginAttempts.delete(ip)
-
     return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
-      { error: 'Errore del server' },
+      { error: 'Configurazione admin non valida o errore del server' },
       { status: 500 }
     )
   }

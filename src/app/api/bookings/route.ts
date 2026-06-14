@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertSameOrigin, isAdminRequest } from '@/lib/admin-auth'
 import { query } from '@/lib/db'
 import { sendNewBookingNotification } from '@/lib/push'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+    }
+    if (!assertSameOrigin(request)) {
+      return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
+    }
+
     const booking = await request.json()
 
     const result = await query(
@@ -29,7 +37,6 @@ export async function POST(request: NextRequest) {
 
     const newBooking = result.rows[0]
 
-    // Invia notifica push (non-blocking, gestisce errori internamente)
     try {
       await sendNewBookingNotification({
         bookingId: newBooking.id,
@@ -38,12 +45,10 @@ export async function POST(request: NextRequest) {
         roomType: newBooking.room_type,
         checkIn: newBooking.check_in,
         checkOut: newBooking.check_out,
-        totalAmount: newBooking.total_amount
+        totalAmount: newBooking.total_amount,
       })
-      console.log('✅ Notifica push inviata per prenotazione:', newBooking.booking_number)
     } catch (pushError) {
-      // Log ma non bloccare la risposta se le notifiche falliscono
-      console.error('⚠️ Errore invio notifica push (non critico):', pushError)
+      console.error('Errore invio notifica push (non critico):', pushError)
     }
 
     return NextResponse.json(newBooking, { status: 201 })

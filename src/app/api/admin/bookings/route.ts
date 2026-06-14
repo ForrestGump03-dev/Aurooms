@@ -1,38 +1,19 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
+import { assertSameOrigin, isAdminRequest } from '@/lib/admin-auth'
 import { query } from '@/lib/db'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
-
-// Verifica autenticazione
-async function verifyAuth(request: Request): Promise<boolean> {
-  const token = request.headers.get('cookie')?.match(/admin-token=([^;]+)/)?.[1]
-  
-  if (!token) return false
-
-  try {
-    await jwtVerify(token, JWT_SECRET)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// GET - Ottieni tutte le prenotazioni
 export async function GET(request: Request) {
   try {
-    const isAuthenticated = await verifyAuth(request)
-    if (!isAuthenticated) {
+    if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
 
-    const result = await query(
-      `SELECT * FROM bookings ORDER BY created_at DESC`
-    )
+    const result = await query('SELECT * FROM bookings ORDER BY created_at DESC')
 
-    return NextResponse.json({ bookings: result.rows })
+    return NextResponse.json(
+      { bookings: result.rows },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('Error fetching bookings:', error)
     return NextResponse.json(
@@ -42,12 +23,13 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Crea nuova prenotazione manuale
 export async function POST(request: Request) {
   try {
-    const isAuthenticated = await verifyAuth(request)
-    if (!isAuthenticated) {
+    if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+    }
+    if (!assertSameOrigin(request)) {
+      return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
     }
 
     const data = await request.json()
@@ -59,13 +41,14 @@ export async function POST(request: Request) {
         guest_email,
         guest_phone,
         room_type,
+        room_id,
         check_in,
         check_out,
         guests_count,
         total_amount,
         payment_status,
         special_requests
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         data.booking_number || `MANUAL-${Date.now()}`,
@@ -73,6 +56,7 @@ export async function POST(request: Request) {
         data.guest_email,
         data.guest_phone,
         data.room_type,
+        data.room_id || null,
         data.check_in,
         data.check_out,
         data.guests_count,

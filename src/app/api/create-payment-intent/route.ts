@@ -1,35 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { query } from '@/lib/db'
 import { generateBookingNumber } from '@/lib/utils'
 
+function calculateNightsStrict(checkIn: string, checkOut: string): number {
+  const start = new Date(`${checkIn}T00:00:00Z`)
+  const end = new Date(`${checkOut}T00:00:00Z`)
+  const diff = end.getTime() - start.getTime()
+  return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0
+}
+
+function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { amount, booking } = await request.json()
+    const { booking } = await request.json()
 
-    console.log('=== Creating Payment Intent ===')
-    console.log('Booking data:', booking)
-    console.log('Amount:', amount)
+    if (!booking || !isDateString(booking.checkIn) || !isDateString(booking.checkOut)) {
+      return NextResponse.json({ error: 'Date prenotazione non valide' }, { status: 400 })
+    }
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const roomId = Number.parseInt(String(booking.roomId), 10)
+    const guestsCount = Number.parseInt(String(booking.guestsCount), 10)
+    const nights = calculateNightsStrict(booking.checkIn, booking.checkOut)
+
+    if (!Number.isInteger(roomId) || roomId <= 0 || !Number.isInteger(guestsCount) || guestsCount < 1 || nights < 1) {
+      return NextResponse.json({ error: 'Dati prenotazione non validi' }, { status: 400 })
+    }
+
+    const roomResult = await query(
+      `SELECT id, name, type, price_per_night, max_guests
+       FROM rooms
+       WHERE id = $1 AND available = true`,
+      [roomId]
+    )
+
+    if (!roomResult.rows.length) {
+      return NextResponse.json({ error: 'Stanza non disponibile' }, { status: 404 })
+    }
+
+    const room = roomResult.rows[0]
+    if (Number(room.max_guests) < guestsCount) {
+      return NextResponse.json({ error: 'Numero ospiti superiore alla capienza della stanza' }, { status: 400 })
+    }
+
+    const overlap = await query(
+      `SELECT COUNT(*) as count FROM bookings
+       WHERE room_id = $1
+       AND booking_status IN ('confirmed', 'pending')
+       AND (
+         (check_in <= $2 AND check_out > $2) OR
+         (check_in < $3 AND check_out >= $3) OR
+         (check_in >= $2 AND check_out <= $3)
+       )`,
+      [roomId, booking.checkIn, booking.checkOut]
+    )
+
+    if (Number(overlap.rows[0].count) > 0) {
+      return NextResponse.json({ error: 'Stanza non disponibile per le date selezionate' }, { status: 409 })
+    }
+
+    const subtotal = Number(room.price_per_night) * nights
+    const total = subtotal + subtotal * 0.1
+    const amount = Math.round(total * 100)
+
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount,
       currency: 'eur',
       metadata: {
-        guestName: booking.guestName,
-        guestEmail: booking.guestEmail,
+        guestName: String(booking.guestName || ''),
+        guestEmail: String(booking.guestEmail || ''),
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
-        roomType: booking.roomType,
-        guestsCount: booking.guestsCount.toString(),
+        roomType: room.type,
+        roomId: String(room.id),
+        guestsCount: String(guestsCount),
       },
     })
 
-    // Create booking in database
     const bookingNumber = generateBookingNumber()
-    console.log('Generated booking number:', bookingNumber)
-    console.log('Inserting booking with room_id:', booking.roomId)
-    
+
     await query(
       `INSERT INTO bookings (
         booking_number, guest_name, guest_email, guest_phone,
@@ -38,25 +90,24 @@ export async function POST(request: NextRequest) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         bookingNumber,
-        booking.guestName,
-        booking.guestEmail,
-        booking.guestPhone,
+        String(booking.guestName || '').trim(),
+        String(booking.guestEmail || '').trim(),
+        String(booking.guestPhone || '').trim(),
         booking.checkIn,
         booking.checkOut,
-        booking.guestsCount,
-        booking.roomType,
-        booking.roomId || null,  // Add room_id
-        amount / 100, // Convert back from cents
+        guestsCount,
+        room.type,
+        room.id,
+        amount / 100,
         paymentIntent.id,
         booking.specialRequests || null,
       ]
     )
 
-    console.log('✅ Booking created successfully in database')
-
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       bookingNumber,
+      amount,
     })
   } catch (error) {
     console.error('Payment intent creation error:', error)

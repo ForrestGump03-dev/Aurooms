@@ -3,10 +3,11 @@ import Link from 'next/link'
 import { Metadata } from 'next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Wifi, Car, Coffee, Bath, Tv, Phone, Mail, BathIcon } from 'lucide-react'
+import { Users, Wifi, Car, Coffee, Bath, Tv, Phone } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { query } from '@/lib/db'
 import { Room } from '@/types'
+import { getSiteSettings } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: 'Our Rooms & Suites - Premium Accommodation in Cinisi, Sicily',
@@ -65,7 +66,11 @@ const amenityIcons = {
 }
 
 export default async function RoomsPage() {
-  const rooms = await getRooms()
+  const [rooms, settings] = await Promise.all([
+    getRooms(),
+    getSiteSettings(),
+  ])
+
   return (
     <div className="pt-16">
       {/* Hero Section */}
@@ -162,7 +167,7 @@ export default async function RoomsPage() {
                             Book This Room
                           </Button>
                         </Link>
-                        <Link href="https://wa.me/393758843175">
+                        <Link href={settings.whatsappUrl}>
                           <Button size="lg" variant="outline">
                             Ask Questions
                           </Button>
@@ -193,7 +198,7 @@ export default async function RoomsPage() {
                 Book Your Stay
               </Button>
             </Link>
-            <Link href="tel:+393758843175">
+            <Link href={`tel:${settings.phoneHref}`}>
               <Button size="xl" variant="outline" className="border-white text-white hover:bg-white hover:text-primary-600">
                 Call for Reservations
               </Button>

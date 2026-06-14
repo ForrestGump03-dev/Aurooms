@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { MapPin, Phone, Mail, Plane, Star } from 'lucide-react'
+import { fullAddress, getSiteSettings } from '@/lib/site-settings'
 
-export default function Footer() {
+export default async function Footer() {
+  const settings = await getSiteSettings()
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -22,8 +25,7 @@ export default function Footer() {
               <span className="font-serif font-bold text-xl">AuRooms</span>
             </div>
             <p className="text-gray-400 text-sm">
-              Experience authentic Sicilian luxury just 3km from Palermo Airport. 
-              Your perfect gateway to discovering the beauty of Sicily.
+              {settings.description}
             </p>
             <div className="flex items-center space-x-1">
               <div className="flex">
@@ -54,25 +56,25 @@ export default function Footer() {
               <li className="flex items-center space-x-2">
                 <MapPin className="w-4 h-4 text-gold-400 flex-shrink-0" />
                 <a 
-                  href="https://maps.app.goo.gl/GyEnYbbnxYT872uA9" 
+                  href={settings.mapsUrl}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-gray-400 text-sm hover:text-gold-400 transition-colors"
                 >
-                  Piazza Pietro Venuti, 12, 90045 Cinisi PA
+                  {fullAddress(settings)}
                 </a>
               </li>
               <li className="flex items-center space-x-2">
                 <Phone className="w-4 h-4 text-gold-400 flex-shrink-0" />
-                <span className="text-gray-400 text-sm">+39 375 884 3175</span>
+                <span className="text-gray-400 text-sm">{settings.phoneDisplay}</span>
               </li>
               <li className="flex items-center space-x-2">
                 <Mail className="w-4 h-4 text-gold-400 flex-shrink-0" />
-                <span className="text-gray-400 text-sm">info@aurooms.it</span>
+                <span className="text-gray-400 text-sm">{settings.email}</span>
               </li>
               <li className="flex items-center space-x-2">
                 <Plane className="w-4 h-4 text-gold-400 flex-shrink-0" />
-                <span className="text-gray-400 text-sm">3km from Palermo Airport</span>
+                <span className="text-gray-400 text-sm">{settings.airportDistanceLabel}</span>
               </li>
             </ul>
           </div>

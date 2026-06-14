@@ -6,18 +6,27 @@ import StructuredData from '@/components/StructuredData'
 import CookieBanner from '@/components/CookieBanner'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { getSiteSettings } from '@/lib/site-settings'
 
-export const metadata: Metadata = {
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings()
+
+  return {
   metadataBase: new URL('https://aurooms.it'),
   title: {
-    default: 'AuRooms - Luxury Guest House Cinisi | Near Palermo Airport',
-    template: '%s | AuRooms'
+    default: `${settings.shortName} - Luxury Guest House ${settings.city} | Near Palermo Airport`,
+    template: `%s | ${settings.shortName}`
   },
-  description: 'Experience authentic Sicilian luxury at AuRooms Guest House. Located in Piazza Pietro Venuti, Cinisi, just 3km from Palermo Airport. Premium rooms, stunning views, and exceptional hospitality near beaches and Palermo.',
-  keywords: ['Sicily hotel', 'Cinisi accommodation', 'Palermo airport hotel', 'luxury guest house Sicily', 'Sicily vacation rental', 'Piazza Pietro Venuti', 'Cinisi guest house', 'Sicily accommodation', 'Palermo beach hotel', 'Sicily rooms', 'Italian guest house', 'Sicily lodging', 'Cinisi PA hotel'],
-  authors: [{ name: 'AuRooms Guest House' }],
+  description: settings.description,
+  alternates: {
+    canonical: settings.websiteUrl,
+  },
+  keywords: ['Sicily hotel', `${settings.city} accommodation`, 'Palermo airport hotel', 'luxury guest house Sicily', 'Sicily vacation rental', `${settings.city} guest house`, 'Sicily accommodation', 'Palermo beach hotel', 'Sicily rooms', 'Italian guest house', 'Sicily lodging'],
+  authors: [{ name: settings.businessName }],
   creator: 'Alessio Forestieri',
-  publisher: 'AuRooms Guest House',
+  publisher: settings.businessName,
   formatDetection: {
     email: false,
     address: false,
@@ -27,23 +36,23 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     alternateLocale: ['it_IT'],
-    url: 'https://aurooms.it',
-    siteName: 'AuRooms Guest House',
-    title: 'AuRooms - Luxury Guest House Cinisi | Near Palermo Airport',
-    description: 'Experience authentic Sicilian luxury at AuRooms. Premium rooms near Palermo Airport with stunning views, exceptional service, and easy access to Sicily\'s beautiful beaches.',
+    url: settings.websiteUrl,
+    siteName: settings.businessName,
+    title: `${settings.shortName} - Luxury Guest House ${settings.city} | Near Palermo Airport`,
+    description: settings.description,
     images: [
       {
         url: '/logo_aurooms.png',
         width: 1200,
         height: 630,
-        alt: 'AuRooms Guest House - Luxury Accommodation in Sicily',
+        alt: `${settings.businessName} - Luxury Accommodation in Sicily`,
       }
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AuRooms - Luxury Guest House Cinisi | Near Palermo Airport',
-    description: 'Experience authentic Sicilian luxury just 3km from Palermo Airport. Premium rooms, stunning views, exceptional hospitality.',
+    title: `${settings.shortName} - Luxury Guest House ${settings.city} | Near Palermo Airport`,
+    description: settings.description,
     images: ['/logo_aurooms.png'],
   },
   robots: {
@@ -71,6 +80,7 @@ export const metadata: Metadata = {
     // yandex: 'your-yandex-verification-code',
     // bing: 'your-bing-verification-code',
   },
+  }
 }
 
 export default function RootLayout({
@@ -81,7 +91,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
-        <link rel="canonical" href="https://aurooms.it" />
         <StructuredData />
       </head>
       <body>

@@ -1,157 +1,107 @@
-export default function StructuredData() {
+import { getAvailableRooms } from '@/lib/rooms'
+import { fullAddress, getSiteSettings } from '@/lib/site-settings'
+
+export default async function StructuredData() {
+  const settings = await getSiteSettings()
+  const rooms = await getAvailableRooms().catch(error => {
+    console.error('Failed to load structured data rooms:', error)
+    return []
+  })
+
+  const sameAs = [settings.facebookUrl, settings.instagramUrl].filter(Boolean)
+  const businessUrl = settings.websiteUrl.replace(/\/$/, '')
+
   const localBusinessSchema = {
     '@context': 'https://schema.org',
     '@type': 'Hotel',
-    '@id': 'https://aurooms.it/#hotel',
-    name: 'AuRooms Guest House',
-    alternateName: 'AuRooms',
-    description: 'Luxury guest house in Cinisi, Sicily, just 3km from Palermo Airport. Premium accommodation with stunning views and exceptional Sicilian hospitality.',
-    url: 'https://aurooms.it',
-    telephone: '+39-375-884-3175',
-    email: 'info@aurooms.it',
+    '@id': `${businessUrl}/#hotel`,
+    name: settings.businessName,
+    alternateName: settings.shortName,
+    description: settings.description,
+    url: businessUrl,
+    telephone: settings.phoneDisplay,
+    email: settings.email,
     priceRange: '€€',
     starRating: {
       '@type': 'Rating',
       ratingValue: '4.9',
-      bestRating: '5'
+      bestRating: '5',
     },
-    image: 'https://aurooms.it/logo_aurooms.png',
-    logo: 'https://aurooms.it/logo_aurooms.png',
+    image: `${businessUrl}/logo_aurooms.png`,
+    logo: `${businessUrl}/logo_aurooms.png`,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Piazza Pietro Venuti, 12',
-      addressLocality: 'Cinisi',
-      addressRegion: 'PA',
-      postalCode: '90045',
-      addressCountry: 'IT'
+      streetAddress: settings.addressLine,
+      addressLocality: settings.city,
+      addressRegion: settings.province,
+      postalCode: settings.postalCode,
+      addressCountry: 'IT',
     },
     geo: {
       '@type': 'GeoCoordinates',
       latitude: 38.1517,
-      longitude: 13.0995
+      longitude: 13.0995,
     },
     openingHoursSpecification: {
       '@type': 'OpeningHoursSpecification',
-      dayOfWeek: [
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-        'Sunday'
-      ],
-      opens: '15:00',
-      closes: '23:00'
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      opens: settings.checkInTime,
+      closes: '23:00',
     },
-    checkinTime: '15:00',
-    checkoutTime: '11:00',
+    checkinTime: settings.checkInTime,
+    checkoutTime: settings.checkOutTime,
     amenityFeature: [
-      {
-        '@type': 'LocationFeatureSpecification',
-        name: 'Free WiFi',
-        value: true
-      },
-      {
-        '@type': 'LocationFeatureSpecification',
-        name: 'Air Conditioning',
-        value: true
-      },
-      {
-        '@type': 'LocationFeatureSpecification',
-        name: 'Airport Transfer',
-        value: true
-      },
-      {
-        '@type': 'LocationFeatureSpecification',
-        name: 'Breakfast',
-        value: true
-      }
+      { '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
+      { '@type': 'LocationFeatureSpecification', name: 'Air Conditioning', value: true },
+      { '@type': 'LocationFeatureSpecification', name: 'Airport Transfer', value: true },
+      { '@type': 'LocationFeatureSpecification', name: 'Breakfast', value: true },
     ],
-    containsPlace: [
-      {
-        '@type': 'Accommodation',
-        name: 'Blue Room',
-        description: 'Family room with premium amenities',
-        occupancy: {
-          '@type': 'QuantitativeValue',
-          maxValue: 4
-        }
+    containsPlace: rooms.map(room => ({
+      '@type': 'Accommodation',
+      name: room.name,
+      description: room.description,
+      occupancy: {
+        '@type': 'QuantitativeValue',
+        maxValue: room.maxGuests,
       },
-      {
-        '@type': 'Accommodation',
-        name: 'Glicine Room',
-        description: 'Couple room with elegant design',
-        occupancy: {
-          '@type': 'QuantitativeValue',
-          maxValue: 2
-        }
-      },
-      {
-        '@type': 'Accommodation',
-        name: 'Yellow Room',
-        description: 'Couple room with modern comfort',
-        occupancy: {
-          '@type': 'QuantitativeValue',
-          maxValue: 2
-        }
-      }
-    ],
-    sameAs: [
-      // Aggiungi qui i link ai profili social se disponibili
-      // 'https://www.facebook.com/aurooms',
-      // 'https://www.instagram.com/aurooms',
-    ]
+    })),
+    sameAs,
   }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: 'https://aurooms.it'
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Rooms',
-        item: 'https://aurooms.it/rooms'
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: 'Booking',
-        item: 'https://aurooms.it/booking'
-      }
-    ]
+      { '@type': 'ListItem', position: 1, name: 'Home', item: businessUrl },
+      { '@type': 'ListItem', position: 2, name: 'Rooms', item: `${businessUrl}/rooms` },
+      { '@type': 'ListItem', position: 3, name: 'Booking', item: `${businessUrl}/booking` },
+    ],
   }
 
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    '@id': 'https://aurooms.it/#organization',
-    name: 'AuRooms Guest House',
-    url: 'https://aurooms.it',
-    logo: 'https://aurooms.it/logo_aurooms.png',
+    '@id': `${businessUrl}/#organization`,
+    name: settings.businessName,
+    url: businessUrl,
+    logo: `${businessUrl}/logo_aurooms.png`,
     contactPoint: {
       '@type': 'ContactPoint',
-      telephone: '+39-375-884-3175',
+      telephone: settings.phoneDisplay,
       contactType: 'Customer Service',
-      email: 'info@aurooms.it',
+      email: settings.email,
       availableLanguage: ['English', 'Italian'],
-      areaServed: 'IT'
+      areaServed: 'IT',
     },
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Piazza Pietro Venuti, 12',
-      addressLocality: 'Cinisi',
-      addressRegion: 'Sicily',
-      postalCode: '90045',
-      addressCountry: 'IT'
-    }
+      streetAddress: settings.addressLine,
+      addressLocality: settings.city,
+      addressRegion: settings.province,
+      postalCode: settings.postalCode,
+      addressCountry: 'IT',
+    },
+    description: fullAddress(settings),
   }
 
   return (

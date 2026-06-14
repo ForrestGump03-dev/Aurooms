@@ -1,11 +1,15 @@
 import { Metadata } from 'next'
+import { getSiteSettings } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: 'Terms of Service | AuRooms',
   description: 'Terms and conditions for booking at AuRooms Guest House',
 }
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const settings = await getSiteSettings()
+  const websiteLabel = settings.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-16">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -26,11 +30,11 @@ export default function TermsPage() {
             <div className="bg-blue-50 border-l-4 border-blue-500 p-4 my-4">
               <p className="text-sm text-gray-700">
                 <strong>Property Details:</strong><br />
-                AuRooms Guest House<br />
-                Piazza Pietro Venuti, 12<br />
-                90045 Cinisi PA, Italy<br />
-                Email: info@aurooms.it<br />
-                WhatsApp/Phone: +39 375 884 3175
+                {settings.businessName}<br />
+                {settings.addressLine}<br />
+                {settings.postalCode} {settings.city} {settings.province}, {settings.country}<br />
+                Email: {settings.email}<br />
+                WhatsApp/Phone: {settings.phoneDisplay}
               </p>
             </div>
           </section>
@@ -39,7 +43,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Booking and Reservations</h2>
             <h3 className="text-xl font-semibold text-gray-800 mb-3">2.1 Booking Process</h3>
             <p className="text-gray-700 mb-4">
-              All bookings must be made through our website at www.aurooms.it. Upon successful payment, you will receive 
+              All bookings must be made through our website at {websiteLabel}. Upon successful payment, you will receive 
               a booking confirmation email containing your booking number and reservation details.
             </p>
             
@@ -127,9 +131,9 @@ export default function TermsPage() {
               To cancel a reservation, please contact us as soon as possible:
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
-              <li><strong>Email:</strong> info@aurooms.it</li>
-              <li><strong>WhatsApp:</strong> +39 375 884 3175 (fastest response)</li>
-              <li><strong>Phone:</strong> +39 375 884 3175</li>
+              <li><strong>Email:</strong> {settings.email}</li>
+              <li><strong>WhatsApp:</strong> {settings.phoneDisplay} (fastest response)</li>
+              <li><strong>Phone:</strong> {settings.phoneDisplay}</li>
             </ul>
             <p className="text-gray-700 mt-4">
               Please include your booking number and the reason for cancellation. Cancellations must be confirmed in writing (email or WhatsApp message). 
@@ -184,8 +188,8 @@ export default function TermsPage() {
               Please contact us via:
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
-              <li><strong>WhatsApp:</strong> +39 375 884 3175 (fastest response)</li>
-              <li><strong>Email:</strong> info@aurooms.it</li>
+              <li><strong>WhatsApp:</strong> {settings.phoneDisplay} (fastest response)</li>
+              <li><strong>Email:</strong> {settings.email}</li>
             </ul>
             <p className="text-gray-700 mt-4">
               If late check-out is not available due to same-day arrivals, complimentary luggage storage will be provided 
@@ -267,7 +271,7 @@ export default function TermsPage() {
             </div>
             <p className="text-gray-700">
               Service animals may be permitted with advance notice and appropriate documentation. Please contact us 
-              at info@aurooms.it or +39 375 884 3175 to discuss your specific situation.
+              at {settings.email} or {settings.phoneDisplay} to discuss your specific situation.
             </p>
           </section>
 
@@ -338,9 +342,9 @@ export default function TermsPage() {
               the problem promptly:
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
-              <li>WhatsApp: +39 375 884 3175 (fastest response)</li>
-              <li>Email: info@aurooms.it</li>
-              <li>Phone: +39 375 884 3175</li>
+              <li>WhatsApp: {settings.phoneDisplay} (fastest response)</li>
+              <li>Email: {settings.email}</li>
+              <li>Phone: {settings.phoneDisplay}</li>
             </ul>
 
             <h3 className="text-xl font-semibold text-gray-800 mb-3">10.2 Post-Stay Complaints</h3>
@@ -389,13 +393,13 @@ export default function TermsPage() {
             </p>
             <div className="bg-gray-50 p-6 rounded-lg">
               <p className="text-gray-700">
-                <strong>AuRooms Guest House</strong><br />
-                Piazza Pietro Venuti, 12<br />
-                90045 Cinisi PA, Italy<br /><br />
-                Email: <a href="mailto:info@aurooms.it" className="text-blue-600 hover:underline">info@aurooms.it</a><br />
-                WhatsApp: <a href="https://wa.me/393758843175" className="text-blue-600 hover:underline">+39 375 884 3175</a><br />
-                Phone: +39 375 884 3175<br />
-                Website: <a href="https://www.aurooms.it" className="text-blue-600 hover:underline">www.aurooms.it</a>
+                <strong>{settings.businessName}</strong><br />
+                {settings.addressLine}<br />
+                {settings.postalCode} {settings.city} {settings.province}, {settings.country}<br /><br />
+                Email: <a href={`mailto:${settings.email}`} className="text-blue-600 hover:underline">{settings.email}</a><br />
+                WhatsApp: <a href={settings.whatsappUrl} className="text-blue-600 hover:underline">{settings.phoneDisplay}</a><br />
+                Phone: {settings.phoneDisplay}<br />
+                Website: <a href={settings.websiteUrl} className="text-blue-600 hover:underline">{websiteLabel}</a>
               </p>
             </div>
           </section>

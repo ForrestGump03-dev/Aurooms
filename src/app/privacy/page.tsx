@@ -1,11 +1,14 @@
 import { Metadata } from 'next'
+import { fullAddress, getSiteSettings } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | AuRooms',
   description: 'Privacy Policy and data protection information for AuRooms Guest House',
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const settings = await getSiteSettings()
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-16">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -26,11 +29,11 @@ export default function PrivacyPage() {
             <div className="bg-blue-50 border-l-4 border-blue-500 p-4 my-4">
               <p className="text-sm text-gray-700">
                 <strong>Data Controller:</strong><br />
-                AuRooms Guest House<br />
-                Piazza Pietro Venuti, 12<br />
-                90045 Cinisi PA, Italy<br />
-                Email: info@aurooms.it<br />
-                Phone: +39 375 884 3175
+                {settings.businessName}<br />
+                {settings.addressLine}<br />
+                {settings.postalCode} {settings.city} {settings.province}, {settings.country}<br />
+                Email: {settings.email}<br />
+                Phone: {settings.phoneDisplay}
               </p>
             </div>
           </section>
@@ -136,9 +139,9 @@ export default function PrivacyPage() {
             <div className="bg-blue-50 border-l-4 border-blue-500 p-4 my-4">
               <p className="text-sm text-gray-700">
                 <strong>To exercise your rights, contact us at:</strong><br />
-                Email: info@aurooms.it<br />
-                WhatsApp: +39 375 884 3175<br />
-                Mail: Piazza Pietro Venuti, 12, 90045 Cinisi PA, Italy
+                Email: {settings.email}<br />
+                WhatsApp: {settings.phoneDisplay}<br />
+                Mail: {fullAddress(settings)}, {settings.country}
               </p>
               <p className="text-sm text-gray-700 mt-2">
                 We will respond to your request within 30 days as required by GDPR.
@@ -247,12 +250,12 @@ export default function PrivacyPage() {
             </p>
             <div className="bg-gray-50 p-6 rounded-lg">
               <p className="text-gray-700">
-                <strong>AuRooms Guest House</strong><br />
-                Piazza Pietro Venuti, 12<br />
-                90045 Cinisi PA, Italy<br /><br />
-                Email: <a href="mailto:info@aurooms.it" className="text-blue-600 hover:underline">info@aurooms.it</a><br />
-                WhatsApp: <a href="https://wa.me/393758843175" className="text-blue-600 hover:underline">+39 375 884 3175</a><br />
-                Phone: +39 375 884 3175
+                <strong>{settings.businessName}</strong><br />
+                {settings.addressLine}<br />
+                {settings.postalCode} {settings.city} {settings.province}, {settings.country}<br /><br />
+                Email: <a href={`mailto:${settings.email}`} className="text-blue-600 hover:underline">{settings.email}</a><br />
+                WhatsApp: <a href={settings.whatsappUrl} className="text-blue-600 hover:underline">{settings.phoneDisplay}</a><br />
+                Phone: {settings.phoneDisplay}
               </p>
             </div>
           </section>

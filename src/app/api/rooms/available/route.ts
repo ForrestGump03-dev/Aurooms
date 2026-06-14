@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { mapRoomRow } from '@/lib/rooms'
 
 // GET /api/rooms/available?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=N
 export async function GET(request: NextRequest) {
@@ -51,17 +52,8 @@ export async function GET(request: NextRequest) {
       
       if (!isBooked) {
         availableRooms.push({
-          id: String(room.id),
-          name: room.name,
-          type: room.type,
-          description: room.description || '',
-          pricePerNight: Number(room.price_per_night),
-          maxGuests: room.max_guests,
-          size: room.size || '',
-          bedType: room.bed_type || '',
-          amenities: Array.isArray(room.amenities) ? room.amenities : [],
-          imageUrls: Array.isArray(room.image_urls) && room.image_urls.length ? room.image_urls : [],
-          available: true
+          ...mapRoomRow({ ...room, available: true }),
+          available: true,
         })
       }
     }

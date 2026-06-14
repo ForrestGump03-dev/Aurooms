@@ -46,35 +46,39 @@ function CheckoutForm() {
     maxGuests?: number
   }
   const [roomOptions, setRoomOptions] = useState<RoomOption[]>(ROOM_TYPES_FALLBACK as RoomOption[])
+  const [maxGuests, setMaxGuests] = useState(4)
 
   useEffect(() => {
-    // fetch without dates initially
     let mounted = true
     ;(async () => {
       try {
         const res = await fetch('/api/rooms')
         if (!res.ok) return
         const data = await res.json()
-        const options = Array.isArray(data) ? data.map((r: any) => ({
-          id: r.type || String(r.id),
+        const rooms = Array.isArray(data?.rooms) ? data.rooms : Array.isArray(data) ? data : []
+        const options = rooms.map((r: any) => ({
+          id: String(r.id),
+          roomId: Number(r.id),
+          type: r.type,
           name: r.name || (r.type || 'Room'),
-          price: r.price_per_night ? Number(r.price_per_night) : 0,
+          price: Number(r.pricePerNight ?? r.price_per_night ?? 0),
           available: true,
-        })) : []
+          maxGuests: Number(r.maxGuests ?? r.max_guests ?? 1),
+        }))
 
         if (mounted && options.length) {
           setRoomOptions(options)
-          const hasCurrent = options.some((o: any) => o.id === formData.roomType)
-          if (!hasCurrent) {
-            setFormData(prev => ({ ...prev, roomType: options[0].id }))
-          }
+          setMaxGuests(Math.max(1, ...options.map((o: RoomOption) => o.maxGuests || 1)))
+          setFormData(prev => options.some((option: RoomOption) => option.id === prev.roomType)
+            ? prev
+            : { ...prev, roomType: options[0].id })
         }
       } catch (error) {
         console.error('Failed to fetch rooms for booking form:', error)
       }
     })()
     return () => { mounted = false }
-  }, [formData.roomType])
+  }, [])
 
   // refetch available rooms when dates or guests change
   useEffect(() => {
@@ -93,9 +97,9 @@ function CheckoutForm() {
         
         if (data.available && Array.isArray(data.rooms)) {
           const availableRooms = data.rooms.map((r: any) => ({
-            id: `${r.id}-${r.type}`,  // Combine ID and type for uniqueness
-            roomId: r.id,              // Store actual room ID
-            type: r.type,              // Store room type for booking
+            id: String(r.id),
+            roomId: Number(r.id),
+            type: r.type,
             name: r.name,
             price: r.pricePerNight,
             available: true,
@@ -138,6 +142,10 @@ function CheckoutForm() {
       alert('Please accept the Terms of Service and Privacy Policy to continue.')
       return
     }
+    if (!selectedRoom) {
+      alert('Please select an available room to continue.')
+      return
+    }
 
     setLoading(true)
 
@@ -162,7 +170,12 @@ function CheckoutForm() {
         }),
       })
 
-      const { clientSecret } = await response.json()
+      const paymentData = await response.json()
+      if (!response.ok) {
+        alert(paymentData.error || 'Unable to create payment. Please try again.')
+        return
+      }
+      const { clientSecret } = paymentData
 
       // Confirm payment
       const cardElement = elements.getElement(CardElement)!
@@ -299,7 +312,7 @@ function CheckoutForm() {
                     className="w-full h-9 pl-10 pr-3 border border-gray-300 rounded-md bg-white text-sm focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
                     aria-label="Number of Guests"
                   >
-                    {[1,2,3,4].map(num => (
+                    {Array.from({ length: maxGuests }, (_, index) => index + 1).map(num => (
                       <option key={num} value={num}>{num} Guest{num > 1 ? 's' : ''}</option>
                     ))}
                   </select>
@@ -406,7 +419,7 @@ function CheckoutForm() {
               type="submit" 
               className="w-full" 
               size="lg"
-              disabled={!stripe || loading || !acceptedTerms}
+              disabled={!stripe || loading || !acceptedTerms || !selectedRoom}
             >
               {loading ? 'Processing...' : `Pay ${formatCurrency(total)}`}
             </Button>

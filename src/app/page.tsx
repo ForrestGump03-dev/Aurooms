@@ -8,7 +8,6 @@ import {
   Plane, 
   MapPin, 
   Wifi, 
-  Coffee, 
   Utensils, 
   Shield, 
   Clock,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react'
 import { query } from '@/lib/db'
 import { Room } from '@/types'
+import { fullAddress, getSiteSettings } from '@/lib/site-settings'
 
 async function getFeaturedRooms(): Promise<Room[]> {
   try {
@@ -96,7 +96,11 @@ const testimonials = [
 ]
 
 export default async function HomePage() {
-  const featuredRooms = await getFeaturedRooms()
+  const [featuredRooms, settings] = await Promise.all([
+    getFeaturedRooms(),
+    getSiteSettings(),
+  ])
+
   return (
     <>
       <Hero />
@@ -316,19 +320,19 @@ export default async function HomePage() {
                 <div className="flex items-center space-x-3">
                   <MapPin className="w-5 h-5 text-gold-400 flex-shrink-0" />
                   <span className="text-gray-300">
-                    Piazza Pietro Venuti, 12, 90045 Cinisi PA</span>
+                    {fullAddress(settings)}</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Phone className="w-5 h-5 text-gold-400 flex-shrink-0" />
-                  <span className="text-gray-300">+39 375 884 3175</span>
+                  <span className="text-gray-300">{settings.phoneDisplay}</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Mail className="w-5 h-5 text-gold-400 flex-shrink-0" />
-                  <span className="text-gray-300">info@aurooms.it</span>
+                  <span className="text-gray-300">{settings.email}</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Plane className="w-5 h-5 text-gold-400 flex-shrink-0" />
-                  <span className="text-gray-300">Just 3km from Palermo Airport</span>
+                  <span className="text-gray-300">Just {settings.airportDistanceLabel}</span>
                 </div>
               </div>
 
@@ -338,7 +342,7 @@ export default async function HomePage() {
                     Book Now
                   </Button>
                 </Link>
-                <Link href="tel:+393758843175">
+                <Link href={`tel:${settings.phoneHref}`}>
                   <Button size="xl" variant="outline" className="border-white text-white hover:bg-white hover:text-gray-900">
                     Call Us
                   </Button>

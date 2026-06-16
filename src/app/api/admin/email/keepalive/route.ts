@@ -1,5 +1,19 @@
 import { NextResponse } from 'next/server'
 
+async function readBrevoError(response: Response) {
+  const text = await response.text().catch(() => '')
+  if (!text) return `Errore Brevo API: ${response.status}`
+
+  try {
+    const data = JSON.parse(text) as { message?: unknown; code?: unknown }
+    const message = typeof data.message === 'string' ? data.message : text
+    const code = typeof data.code === 'string' ? ` (${data.code})` : ''
+    return `Errore Brevo API ${response.status}${code}: ${message}`
+  } catch {
+    return `Errore Brevo API ${response.status}: ${text}`
+  }
+}
+
 export async function GET(request: Request) {
   // Verifica che sia una chiamata dal Cron di Vercel
   const secret = process.env.CRON_SECRET
@@ -32,12 +46,13 @@ export async function GET(request: Request) {
     })
 
     if (!response.ok) {
-      throw new Error(`Errore Brevo API: ${response.status}`)
+      throw new Error(await readBrevoError(response))
     }
 
     return NextResponse.json({ success: true, message: 'Ping inviato con successo.' })
   } catch (error) {
-    console.error('Errore nel keepalive:', error)
-    return NextResponse.json({ error: 'Errore durante il ping' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Errore sconosciuto'
+    console.error('Errore nel keepalive:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

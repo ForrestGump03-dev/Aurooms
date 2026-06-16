@@ -138,60 +138,112 @@ async function renderEmailHtml(templateKey: EmailTemplateKey, payload: Record<st
   const meta = getTemplateMeta(templateKey, payload)
   const checkInDate = formatDate(booking.checkIn)
   const checkOutDate = formatDate(booking.checkOut)
-  const websiteLabel = settings.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const siteUrl = settings.websiteUrl.replace(/\/$/, '')
+  const logoUrl = `${siteUrl}/logo_aurooms.png`
+  const websiteLabel = siteUrl.replace(/^https?:\/\//, '')
   const total = Number(booking.totalAmount || 0).toFixed(2)
 
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">${escapeHtml(settings.shortName)}</h1>
-        <p style="color: #e0e7ff; margin: 10px 0 0 0;">${escapeHtml(settings.tagline)}</p>
+    <div style="margin: 0; padding: 0; background: #f7f3ea; font-family: Arial, Helvetica, sans-serif; color: #111827;">
+      <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+        ${escapeHtml(meta.intro)} Booking number ${escapeHtml(booking.bookingNumber)}.
       </div>
 
-      <div style="padding: 30px; background: #ffffff;">
-        <h2 style="color: #1d4ed8; margin: 0 0 20px 0;">${escapeHtml(meta.heading)}</h2>
+      <div style="max-width: 640px; margin: 0 auto; padding: 28px 12px;">
+        <div style="background: #111827; border-radius: 10px 10px 0 0; overflow: hidden;">
+          <div style="height: 6px; background: #f59e0b; line-height: 6px;">&nbsp;</div>
+          <div style="padding: 30px 28px 26px; text-align: center;">
+            <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(settings.shortName)}" width="112" style="display: block; width: 112px; max-width: 112px; height: auto; margin: 0 auto 18px; border-radius: 999px;">
+            <div style="font-family: Georgia, 'Times New Roman', serif; color: #ffffff; font-size: 30px; font-weight: bold; letter-spacing: 0; line-height: 1.2;">
+              ${escapeHtml(settings.shortName)}
+            </div>
+            <div style="color: #fbbf24; font-size: 13px; margin-top: 8px; line-height: 1.5;">
+              ${escapeHtml(settings.tagline)}
+            </div>
+          </div>
+        </div>
 
-        <p>Dear ${escapeHtml(booking.guestName)},</p>
-        <p>${escapeHtml(meta.intro)}</p>
+        <div style="background: #ffffff; padding: 34px 30px; border-left: 1px solid #eadfcb; border-right: 1px solid #eadfcb;">
+          <div style="display: inline-block; padding: 6px 10px; border-radius: 999px; background: #fef7ed; color: #92400e; font-size: 12px; font-weight: bold; margin-bottom: 16px;">
+            ${escapeHtml(booking.bookingNumber)}
+          </div>
 
-        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin: 0 0 15px 0; color: #1d4ed8;">Booking Details</h3>
-          <p><strong>Booking Number:</strong> ${escapeHtml(booking.bookingNumber)}</p>
-          <p><strong>Guest Name:</strong> ${escapeHtml(booking.guestName)}</p>
-          <p><strong>Check-in:</strong> ${checkInDate}</p>
-          <p><strong>Check-out:</strong> ${checkOutDate}</p>
-          <p><strong>Room Type:</strong> ${escapeHtml(booking.roomType)}</p>
-          <p><strong>Guests:</strong> ${escapeHtml(booking.guestsCount)}</p>
-          <p><strong>Total Amount:</strong> &euro;${escapeHtml(total)}</p>
-          <p style="color: #d97706; font-size: 14px; margin-top: 10px;">
-            <strong>Tourist Tax:</strong> &euro;1 per person per night to be paid on-site (cash only)
+          <h2 style="font-family: Georgia, 'Times New Roman', serif; color: #111827; font-size: 28px; line-height: 1.2; margin: 0 0 16px 0;">
+            ${escapeHtml(meta.heading)}
+          </h2>
+
+          <p style="font-size: 15px; line-height: 1.7; margin: 0 0 10px;">Dear ${escapeHtml(booking.guestName)},</p>
+          <p style="font-size: 15px; line-height: 1.7; margin: 0 0 26px;">${escapeHtml(meta.intro)}</p>
+
+          <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; margin: 0 0 22px; overflow: hidden;">
+            <div style="padding: 18px 20px; border-bottom: 1px solid #e5e7eb; background: #ffffff;">
+              <h3 style="font-family: Georgia, 'Times New Roman', serif; color: #1f2937; font-size: 19px; margin: 0;">Booking Details</h3>
+            </div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Booking Number</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${escapeHtml(booking.bookingNumber)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Guest Name</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${escapeHtml(booking.guestName)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Check-in</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${checkInDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Check-out</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${checkOutDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Room Type</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${escapeHtml(booking.roomType)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 14px 20px; color: #6b7280; font-size: 13px; border-bottom: 1px solid #e5e7eb;">Guests</td>
+                <td style="padding: 14px 20px; color: #111827; font-size: 14px; font-weight: bold; text-align: right; border-bottom: 1px solid #e5e7eb;">${escapeHtml(booking.guestsCount)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 20px; color: #111827; font-size: 14px; font-weight: bold;">Total Amount</td>
+                <td style="padding: 16px 20px; color: #d97706; font-size: 18px; font-weight: bold; text-align: right;">&euro;${escapeHtml(total)}</td>
+              </tr>
+            </table>
+            <div style="padding: 0 20px 18px;">
+              <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e; font-size: 13px; line-height: 1.5; padding: 12px 14px;">
+                <strong>Tourist Tax:</strong> &euro;1 per person per night to be paid on-site (cash only)
+              </div>
+              ${booking.specialRequests ? `<div style="margin-top: 12px; color: #374151; font-size: 13px; line-height: 1.6;"><strong>Special Requests:</strong> ${escapeHtml(booking.specialRequests)}</div>` : ''}
+            </div>
+          </div>
+
+          <div style="background: #fef7ed; border: 1px solid #fed7aa; border-left: 5px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 0 0 22px;">
+            <h3 style="font-family: Georgia, 'Times New Roman', serif; margin: 0 0 14px 0; color: #92400e; font-size: 19px;">Check-in & Check-out</h3>
+            <p style="margin: 8px 0; font-size: 14px; line-height: 1.6;"><strong>Check-in:</strong> Available from <strong>${escapeHtml(settings.checkInTime)}</strong></p>
+            <p style="margin: 8px 0; font-size: 14px; line-height: 1.6;"><strong>Check-out:</strong> By <strong>${escapeHtml(settings.checkOutTime)}</strong></p>
+            <p style="margin: 16px 0 0; padding: 14px; background: #ffffff; border-radius: 8px; color: #7c2d12; font-size: 13px; line-height: 1.6;">
+              <strong>Important:</strong> Please respect these times. If you need to arrive outside check-in hours or require a late check-out, please contact us in advance via <a href="${escapeHtml(settings.whatsappUrl)}" style="color: #d97706; font-weight: bold;">WhatsApp</a> or <a href="mailto:${escapeHtml(settings.email)}" style="color: #d97706; font-weight: bold;">email</a>.
+            </p>
+          </div>
+
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin: 0 0 26px;">
+            <h3 style="font-family: Georgia, 'Times New Roman', serif; margin: 0 0 14px 0; color: #1d4ed8; font-size: 19px;">Property Information</h3>
+            <p style="margin: 9px 0; font-size: 14px; line-height: 1.6;"><strong>Address:</strong> ${escapeHtml(fullAddress(settings))}</p>
+            <p style="margin: 9px 0; font-size: 14px; line-height: 1.6;"><strong>Airport Distance:</strong> ${escapeHtml(settings.airportDistanceLabel)}</p>
+            <p style="margin: 9px 0; font-size: 14px; line-height: 1.6;"><strong>WhatsApp:</strong> <a href="${escapeHtml(settings.whatsappUrl)}" style="color: #1d4ed8; font-weight: bold;">${escapeHtml(settings.phoneDisplay)}</a></p>
+            <p style="margin: 9px 0; font-size: 14px; line-height: 1.6;"><strong>Email:</strong> <a href="mailto:${escapeHtml(settings.email)}" style="color: #1d4ed8; font-weight: bold;">${escapeHtml(settings.email)}</a></p>
+          </div>
+
+          <p style="font-size: 15px; line-height: 1.7; margin: 0 0 8px;">We look forward to welcoming you to Sicily.</p>
+          <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0;">If you have any questions, please contact us.</p>
+        </div>
+
+        <div style="background: #111827; text-align: center; padding: 24px 28px; border-radius: 0 0 10px 10px;">
+          <img src="${escapeHtml(logoUrl)}" alt="" width="56" style="display: block; width: 56px; max-width: 56px; height: auto; margin: 0 auto 12px; border-radius: 999px;">
+          <p style="color: #ffffff; margin: 0 0 6px; font-size: 14px; font-weight: bold;">${escapeHtml(settings.businessName)}</p>
+          <p style="color: #d1d5db; font-size: 13px; line-height: 1.5; margin: 0;">
+            ${escapeHtml(settings.city)}, Sicily &middot; <a href="${escapeHtml(siteUrl)}" style="color: #fbbf24; text-decoration: none;">${escapeHtml(websiteLabel)}</a>
           </p>
-          ${booking.specialRequests ? `<p><strong>Special Requests:</strong> ${escapeHtml(booking.specialRequests)}</p>` : ''}
-        </div>
-
-        <div style="background: #fef7ed; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin: 0 0 15px 0; color: #d97706;">Check-in & Check-out Instructions</h3>
-          <p style="margin: 10px 0;"><strong>Check-in:</strong> Available from <strong>${escapeHtml(settings.checkInTime)}</strong></p>
-          <p style="margin: 10px 0;"><strong>Check-out:</strong> By <strong>${escapeHtml(settings.checkOutTime)}</strong></p>
-          <p style="margin: 15px 0 10px 0; padding: 15px; background: #fff; border-radius: 6px; color: #92400e;">
-            <strong>Important:</strong> Please respect these times. If you need to arrive outside check-in hours or require a late check-out, please contact us in advance via <a href="${escapeHtml(settings.whatsappUrl)}" style="color: #d97706;">WhatsApp</a> or <a href="mailto:${escapeHtml(settings.email)}" style="color: #d97706;">email</a>.
-          </p>
-        </div>
-
-        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin: 0 0 15px 0; color: #0369a1;">Property Information</h3>
-          <p><strong>Address:</strong> ${escapeHtml(fullAddress(settings))}</p>
-          <p><strong>Airport Distance:</strong> ${escapeHtml(settings.airportDistanceLabel)}</p>
-          <p><strong>WhatsApp:</strong> <a href="${escapeHtml(settings.whatsappUrl)}" style="color: #0369a1;">${escapeHtml(settings.phoneDisplay)}</a></p>
-          <p><strong>Email:</strong> <a href="mailto:${escapeHtml(settings.email)}" style="color: #0369a1;">${escapeHtml(settings.email)}</a></p>
-        </div>
-
-        <p style="margin-top: 30px;">We look forward to welcoming you to Sicily.</p>
-        <p style="color: #6b7280; font-size: 14px;">If you have any questions, please contact us.</p>
-
-        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-          <p style="color: #6b7280; margin: 5px 0;">${escapeHtml(settings.businessName)}</p>
-          <p style="color: #6b7280; font-size: 14px; margin: 5px 0;">${escapeHtml(settings.city)}, Sicily - ${escapeHtml(websiteLabel)}</p>
         </div>
       </div>
     </div>

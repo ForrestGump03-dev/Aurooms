@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
   BedDouble,
   BellRing,
   Calendar,
   DollarSign,
   Download,
   Eye,
+  Globe,
   LogOut,
   Plus,
   RefreshCw,
@@ -391,15 +393,45 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AuRooms Admin</h1>
             <p className="text-sm text-gray-600">Pannello di Amministrazione</p>
           </div>
-          <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2">
-            <LogOut className="w-4 h-4" />
-            Esci
-          </Button>
+
+          <div className="flex items-center gap-3">
+            {settingsForm && (
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                  settingsForm.maintenanceMode
+                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    settingsForm.maintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                  }`}
+                />
+                <span>{settingsForm.maintenanceMode ? 'Manutenzione Attiva' : 'Sito Online'}</span>
+              </div>
+            )}
+
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              <Globe className="w-3.5 h-3.5 text-gray-500" />
+              <span>Vedi Sito</span>
+            </a>
+
+            <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2">
+              <LogOut className="w-4 h-4" />
+              Esci
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -710,46 +742,112 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'settings' && settingsForm && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Impostazioni contatti</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input placeholder="Nome struttura" value={settingsForm.businessName} onChange={event => setSettingsForm({ ...settingsForm, businessName: event.target.value })} />
-                <Input placeholder="Nome breve" value={settingsForm.shortName} onChange={event => setSettingsForm({ ...settingsForm, shortName: event.target.value })} />
-                <Input placeholder="Tagline" value={settingsForm.tagline} onChange={event => setSettingsForm({ ...settingsForm, tagline: event.target.value })} className="md:col-span-2" />
-                <textarea
-                  placeholder="Descrizione footer/SEO"
-                  value={settingsForm.description}
-                  onChange={event => setSettingsForm({ ...settingsForm, description: event.target.value })}
-                  className="md:col-span-2 w-full min-h-24 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-                <Input placeholder="Indirizzo" value={settingsForm.addressLine} onChange={event => setSettingsForm({ ...settingsForm, addressLine: event.target.value })} />
-                <Input placeholder="CAP" value={settingsForm.postalCode} onChange={event => setSettingsForm({ ...settingsForm, postalCode: event.target.value })} />
-                <Input placeholder="Citta" value={settingsForm.city} onChange={event => setSettingsForm({ ...settingsForm, city: event.target.value })} />
-                <Input placeholder="Provincia" value={settingsForm.province} onChange={event => setSettingsForm({ ...settingsForm, province: event.target.value })} />
-                <Input placeholder="Paese" value={settingsForm.country} onChange={event => setSettingsForm({ ...settingsForm, country: event.target.value })} />
-                <Input placeholder="Distanza aeroporto" value={settingsForm.airportDistanceLabel} onChange={event => setSettingsForm({ ...settingsForm, airportDistanceLabel: event.target.value })} />
-                <Input placeholder="Telefono visibile" value={settingsForm.phoneDisplay} onChange={event => setSettingsForm({ ...settingsForm, phoneDisplay: event.target.value })} />
-                <Input placeholder="Telefono link tel:" value={settingsForm.phoneHref} onChange={event => setSettingsForm({ ...settingsForm, phoneHref: event.target.value })} />
-                <Input placeholder="Numero WhatsApp" value={settingsForm.whatsappNumber} onChange={event => setSettingsForm({ ...settingsForm, whatsappNumber: event.target.value })} />
-                <Input placeholder="Email" value={settingsForm.email} onChange={event => setSettingsForm({ ...settingsForm, email: event.target.value })} />
-                <Input placeholder="Google Maps URL" value={settingsForm.mapsUrl} onChange={event => setSettingsForm({ ...settingsForm, mapsUrl: event.target.value })} className="md:col-span-2" />
-                <Input placeholder="Sito web" value={settingsForm.websiteUrl} onChange={event => setSettingsForm({ ...settingsForm, websiteUrl: event.target.value })} />
-                <Input placeholder="Instagram URL" value={settingsForm.instagramUrl} onChange={event => setSettingsForm({ ...settingsForm, instagramUrl: event.target.value })} />
-                <Input placeholder="Facebook URL" value={settingsForm.facebookUrl} onChange={event => setSettingsForm({ ...settingsForm, facebookUrl: event.target.value })} />
-                <Input placeholder="Check-in HH:MM" value={settingsForm.checkInTime} onChange={event => setSettingsForm({ ...settingsForm, checkInTime: event.target.value })} />
-                <Input placeholder="Check-out HH:MM" value={settingsForm.checkOutTime} onChange={event => setSettingsForm({ ...settingsForm, checkOutTime: event.target.value })} />
-                <div className="md:col-span-2">
-                  <Button type="submit" disabled={saving} className="flex items-center gap-2">
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Salvataggio...' : 'Salva impostazioni'}
-                  </Button>
+          <div className="space-y-6">
+            {/* Maintenance Mode Card */}
+            <Card className={`border-2 transition-all ${settingsForm.maintenanceMode ? 'border-amber-400 bg-amber-50/20 shadow-sm' : 'border-gray-200'}`}>
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className={`w-5 h-5 ${settingsForm.maintenanceMode ? 'text-amber-600' : 'text-gray-500'}`} />
+                    <CardTitle className="text-lg">Modalità Manutenzione</CardTitle>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    settingsForm.maintenanceMode ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-green-100 text-green-800'
+                  }`}>
+                    {settingsForm.maintenanceMode ? 'ATTIVA (Accesso Solo Admin)' : 'DISATTIVA (Sito Aperto al Pubblico)'}
+                  </span>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-200 shadow-xs">
+                    <input
+                      type="checkbox"
+                      id="maintenance-toggle"
+                      checked={settingsForm.maintenanceMode}
+                      onChange={event => setSettingsForm({ ...settingsForm, maintenanceMode: event.target.checked })}
+                      className="mt-1 h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <label htmlFor="maintenance-toggle" className="cursor-pointer">
+                      <span className="block font-semibold text-gray-900 text-sm sm:text-base">
+                        Attiva modalità manutenzione per i visitatori
+                      </span>
+                      <span className="block text-xs sm:text-sm text-gray-600 mt-0.5">
+                        Quando attiva, i visitatori esterni vedranno una schermata elegante di manutenzione con i tuoi contatti e le API pubbliche restituiranno codice 503. Come amministratore autenticato, puoi continuare a navigare e testare tutto il sito liberamente.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label htmlFor="maintenance-msg" className="block text-sm font-medium text-gray-700 mb-1">
+                      Messaggio di manutenzione personalizzato (opzionale)
+                    </label>
+                    <textarea
+                      id="maintenance-msg"
+                      placeholder="Inserisci una comunicazione specifica per gli ospiti (es. 'Sito in aggiornamento fino alle ore 22:00'). Se vuoto, viene mostrato il messaggio standard con i canali di contatto WhatsApp, telefono ed email."
+                      value={settingsForm.maintenanceMessage || ''}
+                      onChange={event => setSettingsForm({ ...settingsForm, maintenanceMessage: event.target.value })}
+                      className="w-full min-h-20 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={saveSettings}
+                      disabled={saving}
+                      className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Salvataggio...' : 'Salva Stato Manutenzione'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* General Site Settings Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Impostazioni contatti e struttura</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input placeholder="Nome struttura" value={settingsForm.businessName} onChange={event => setSettingsForm({ ...settingsForm, businessName: event.target.value })} />
+                  <Input placeholder="Nome breve" value={settingsForm.shortName} onChange={event => setSettingsForm({ ...settingsForm, shortName: event.target.value })} />
+                  <Input placeholder="Tagline" value={settingsForm.tagline} onChange={event => setSettingsForm({ ...settingsForm, tagline: event.target.value })} className="md:col-span-2" />
+                  <textarea
+                    placeholder="Descrizione footer/SEO"
+                    value={settingsForm.description}
+                    onChange={event => setSettingsForm({ ...settingsForm, description: event.target.value })}
+                    className="md:col-span-2 w-full min-h-24 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                  <Input placeholder="Indirizzo" value={settingsForm.addressLine} onChange={event => setSettingsForm({ ...settingsForm, addressLine: event.target.value })} />
+                  <Input placeholder="CAP" value={settingsForm.postalCode} onChange={event => setSettingsForm({ ...settingsForm, postalCode: event.target.value })} />
+                  <Input placeholder="Citta" value={settingsForm.city} onChange={event => setSettingsForm({ ...settingsForm, city: event.target.value })} />
+                  <Input placeholder="Provincia" value={settingsForm.province} onChange={event => setSettingsForm({ ...settingsForm, province: event.target.value })} />
+                  <Input placeholder="Paese" value={settingsForm.country} onChange={event => setSettingsForm({ ...settingsForm, country: event.target.value })} />
+                  <Input placeholder="Distanza aeroporto" value={settingsForm.airportDistanceLabel} onChange={event => setSettingsForm({ ...settingsForm, airportDistanceLabel: event.target.value })} />
+                  <Input placeholder="Telefono visibile" value={settingsForm.phoneDisplay} onChange={event => setSettingsForm({ ...settingsForm, phoneDisplay: event.target.value })} />
+                  <Input placeholder="Telefono link tel:" value={settingsForm.phoneHref} onChange={event => setSettingsForm({ ...settingsForm, phoneHref: event.target.value })} />
+                  <Input placeholder="Numero WhatsApp" value={settingsForm.whatsappNumber} onChange={event => setSettingsForm({ ...settingsForm, whatsappNumber: event.target.value })} />
+                  <Input placeholder="Email" value={settingsForm.email} onChange={event => setSettingsForm({ ...settingsForm, email: event.target.value })} />
+                  <Input placeholder="Google Maps URL" value={settingsForm.mapsUrl} onChange={event => setSettingsForm({ ...settingsForm, mapsUrl: event.target.value })} className="md:col-span-2" />
+                  <Input placeholder="Sito web" value={settingsForm.websiteUrl} onChange={event => setSettingsForm({ ...settingsForm, websiteUrl: event.target.value })} />
+                  <Input placeholder="Instagram URL" value={settingsForm.instagramUrl} onChange={event => setSettingsForm({ ...settingsForm, instagramUrl: event.target.value })} />
+                  <Input placeholder="Facebook URL" value={settingsForm.facebookUrl} onChange={event => setSettingsForm({ ...settingsForm, facebookUrl: event.target.value })} />
+                  <Input placeholder="Check-in HH:MM" value={settingsForm.checkInTime} onChange={event => setSettingsForm({ ...settingsForm, checkInTime: event.target.value })} />
+                  <Input placeholder="Check-out HH:MM" value={settingsForm.checkOutTime} onChange={event => setSettingsForm({ ...settingsForm, checkOutTime: event.target.value })} />
+                  <div className="md:col-span-2">
+                    <Button type="submit" disabled={saving} className="flex items-center gap-2">
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Salvataggio...' : 'Salva impostazioni'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
     </div>

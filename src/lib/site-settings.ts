@@ -22,6 +22,8 @@ export interface SiteSettings {
   facebookUrl: string
   checkInTime: string
   checkOutTime: string
+  maintenanceMode: boolean
+  maintenanceMessage: string
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -46,6 +48,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   facebookUrl: '',
   checkInTime: '15:00',
   checkOutTime: '11:00',
+  maintenanceMode: false,
+  maintenanceMessage: '',
 }
 
 function rowToSettings(row: any): SiteSettings {
@@ -71,6 +75,8 @@ function rowToSettings(row: any): SiteSettings {
     facebookUrl: row.facebook_url || '',
     checkInTime: row.check_in_time,
     checkOutTime: row.check_out_time,
+    maintenanceMode: Boolean(row.maintenance_mode),
+    maintenanceMessage: row.maintenance_message || '',
   }
 }
 
@@ -118,6 +124,15 @@ export function validateSiteSettingsPayload(input: any): { settings?: SiteSettin
   const whatsappInput = cleanString(input?.whatsappNumber || input?.whatsappUrl, fallback.whatsappNumber, 50)
   const whatsapp = normalizeWhatsApp(whatsappInput)
 
+  const rawMaintenanceMode = input?.maintenanceMode
+  const maintenanceMode = typeof rawMaintenanceMode === 'boolean'
+    ? rawMaintenanceMode
+    : rawMaintenanceMode === 'true' || rawMaintenanceMode === 1
+      ? true
+      : rawMaintenanceMode === 'false' || rawMaintenanceMode === 0
+        ? false
+        : fallback.maintenanceMode
+
   const settings: SiteSettings = {
     businessName: cleanString(input?.businessName, fallback.businessName, 120),
     shortName: cleanString(input?.shortName, fallback.shortName, 60),
@@ -140,6 +155,8 @@ export function validateSiteSettingsPayload(input: any): { settings?: SiteSettin
     facebookUrl: cleanString(input?.facebookUrl, '', 200),
     checkInTime: cleanString(input?.checkInTime, fallback.checkInTime, 5),
     checkOutTime: cleanString(input?.checkOutTime, fallback.checkOutTime, 5),
+    maintenanceMode,
+    maintenanceMessage: cleanString(input?.maintenanceMessage, '', 1000),
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email)) {
@@ -165,10 +182,10 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSett
        id, business_name, short_name, tagline, description, address_line, postal_code,
        city, province, country, phone_display, phone_href, whatsapp_number, whatsapp_url,
        email, maps_url, airport_distance_label, website_url, instagram_url, facebook_url,
-       check_in_time, check_out_time, updated_at
+       check_in_time, check_out_time, maintenance_mode, maintenance_message, updated_at
      ) VALUES (
        1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-       $17, $18, $19, $20, $21, CURRENT_TIMESTAMP
+       $17, $18, $19, $20, $21, $22, $23, CURRENT_TIMESTAMP
      )
      ON CONFLICT (id) DO UPDATE SET
        business_name = EXCLUDED.business_name,
@@ -192,6 +209,8 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSett
        facebook_url = EXCLUDED.facebook_url,
        check_in_time = EXCLUDED.check_in_time,
        check_out_time = EXCLUDED.check_out_time,
+       maintenance_mode = EXCLUDED.maintenance_mode,
+       maintenance_message = EXCLUDED.maintenance_message,
        updated_at = CURRENT_TIMESTAMP
      RETURNING *`,
     [
@@ -216,6 +235,8 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSett
       settings.facebookUrl || null,
       settings.checkInTime,
       settings.checkOutTime,
+      settings.maintenanceMode,
+      settings.maintenanceMessage || null,
     ]
   )
 

@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
   facebook_url VARCHAR(200),
   check_in_time VARCHAR(5) NOT NULL DEFAULT '15:00',
   check_out_time VARCHAR(5) NOT NULL DEFAULT '11:00',
+  maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE,
+  maintenance_message TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

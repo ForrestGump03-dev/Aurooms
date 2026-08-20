@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { query } from '@/lib/db'
 import { generateBookingNumber } from '@/lib/utils'
+import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/maintenance'
 
 function calculateNightsStrict(checkIn: string, checkOut: string): number {
   const start = new Date(`${checkIn}T00:00:00Z`)
@@ -16,6 +17,10 @@ function isDateString(value: unknown): value is string {
 
 export async function POST(request: NextRequest) {
   try {
+    if (await shouldBlockApiForMaintenance(request)) {
+      return getMaintenanceApiResponse()
+    }
+
     const { booking } = await request.json()
 
     if (!booking || !isDateString(booking.checkIn) || !isDateString(booking.checkOut)) {

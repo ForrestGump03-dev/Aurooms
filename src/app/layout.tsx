@@ -4,9 +4,14 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import StructuredData from '@/components/StructuredData'
 import CookieBanner from '@/components/CookieBanner'
+import MaintenanceView from '@/components/MaintenanceView'
+import AdminMaintenanceBanner from '@/components/AdminMaintenanceBanner'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { getSiteSettings } from '@/lib/site-settings'
+import { isMaintenanceActive } from '@/lib/maintenance'
+import { verifyAdminToken } from '@/lib/admin-auth'
+import { cookies, headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,21 +88,56 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const settings = await getSiteSettings()
+  const headerList = await headers()
+  const cookieStore = await cookies()
+  const adminToken = cookieStore.get('admin-token')?.value
+  const isAdmin = headerList.get('x-is-admin') === '1' || (adminToken ? await verifyAdminToken(adminToken) : false)
+  const pathname = headerList.get('x-pathname') || ''
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isMaintenance = await isMaintenanceActive(settings)
+  const isEnvOverride = process.env.MAINTENANCE_MODE?.toLowerCase().trim() === 'true' || process.env.MAINTENANCE_MODE === '1'
+
+  // If maintenance mode is active, user is NOT admin, and is NOT visiting admin routes:
+  if (isMaintenance && !isAdmin && !isAdminRoute) {
+    return (
+      <html lang="en" className="scroll-smooth">
+        <head>
+          <StructuredData />
+        </head>
+        <body className="bg-stone-950 text-white min-h-screen">
+          <MaintenanceView settings={settings} />
+          <Analytics />
+          <SpeedInsights />
+        </body>
+      </html>
+    )
+  }
+
   return (
     <html lang="en" className="scroll-smooth">
       <head>
         <StructuredData />
       </head>
       <body>
-        <Header />
-        <main>{children}</main>
-        <Footer />
-        <CookieBanner />
+        {isAdmin && isMaintenance && (
+          <AdminMaintenanceBanner isEnvOverride={isEnvOverride} />
+        )}
+        {isAdminRoute ? (
+          <main>{children}</main>
+        ) : (
+          <>
+            <Header />
+            <main>{children}</main>
+            <Footer />
+            <CookieBanner />
+          </>
+        )}
         <Analytics />
         <SpeedInsights />
       </body>

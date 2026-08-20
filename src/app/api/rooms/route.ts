@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getAvailableRooms } from '@/lib/rooms'
+import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/maintenance'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    if (await shouldBlockApiForMaintenance(request)) {
+      return getMaintenanceApiResponse()
+    }
+
     const rooms = await getAvailableRooms()
     return NextResponse.json({ rooms })
   } catch (error) {
@@ -13,6 +18,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (await shouldBlockApiForMaintenance(request)) {
+    return getMaintenanceApiResponse()
+  }
+
   const { roomType, checkIn, checkOut } = await request.json()
 
   const result = await query(

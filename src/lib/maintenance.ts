@@ -3,22 +3,12 @@ import { getSiteSettings, SiteSettings } from './site-settings'
 import { extractAdminToken, verifyAdminToken } from './admin-auth'
 
 /**
- * Checks if maintenance mode is active.
- * 1. An environment variable `MAINTENANCE_MODE=true` forces maintenance mode ON.
- * 2. An environment variable `MAINTENANCE_MODE=false` forces maintenance mode OFF.
- * 3. Otherwise, the database setting in `site_settings.maintenance_mode` is used.
+ * Checks if maintenance mode is active using the bidirectional "last update wins"
+ * state synchronized between `MAINTENANCE_MODE` in `.env` and `site_settings.maintenance_mode`.
  */
 export async function isMaintenanceActive(cachedSettings?: SiteSettings): Promise<boolean> {
-  const envMode = process.env.MAINTENANCE_MODE?.toLowerCase().trim()
-  if (envMode === 'true' || envMode === '1') {
-    return true
-  }
-  if (envMode === 'false' || envMode === '0') {
-    return false
-  }
-
   try {
-    const settings = cachedSettings || await getSiteSettings()
+    const settings = cachedSettings || (await getSiteSettings())
     return Boolean(settings.maintenanceMode)
   } catch (error) {
     console.error('Error checking maintenance mode:', error)
@@ -27,22 +17,15 @@ export async function isMaintenanceActive(cachedSettings?: SiteSettings): Promis
 }
 
 /**
- * Synchronous check for Edge Middleware or runtime where settings object or env is already loaded.
+ * Synchronous check when settings object is already loaded.
  */
 export function isMaintenanceActiveSync(settings?: SiteSettings): boolean {
-  const envMode = process.env.MAINTENANCE_MODE?.toLowerCase().trim()
-  if (envMode === 'true' || envMode === '1') {
-    return true
-  }
-  if (envMode === 'false' || envMode === '0') {
-    return false
-  }
   return Boolean(settings?.maintenanceMode)
 }
 
 /**
  * Helper to check if a backend API request should be blocked.
- * Admins with a valid JWT token bypass maintenance block.
+ * Admins with a valid JWT token (and valid session_version) bypass maintenance block.
  */
 export async function shouldBlockApiForMaintenance(request: Request): Promise<boolean> {
   const active = await isMaintenanceActive()

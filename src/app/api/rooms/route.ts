@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
   const result = await query(
     `SELECT COUNT(*) as count FROM bookings
      WHERE room_type = $1
-     AND booking_status = 'confirmed'
+     AND (
+       booking_status = 'confirmed'
+       OR (booking_status = 'pending' AND payment_status = 'pending' AND created_at > CURRENT_TIMESTAMP - INTERVAL '20 minutes')
+     )
      AND (
        (check_in <= $2 AND check_out > $2) OR
        (check_in < $3 AND check_out >= $3) OR

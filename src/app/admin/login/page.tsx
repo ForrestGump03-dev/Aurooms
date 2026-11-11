@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { Lock, AlertCircle, CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -10,12 +10,15 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [resetMessage, setResetMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setResetMessage('')
     setLoading(true)
 
     try {
@@ -28,7 +31,6 @@ export default function AdminLoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // Login riuscito → redirect alla dashboard
         router.push('/admin/dashboard')
         router.refresh()
       } else {
@@ -38,6 +40,34 @@ export default function AdminLoginPage() {
       setError('Errore di connessione. Riprova.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    setError('')
+    setResetMessage('')
+    setResetLoading(true)
+
+    try {
+      const response = await fetch('/api/admin/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setResetMessage(
+          data.message ||
+            'Ti abbiamo inviato un link via email per impostare una nuova password.'
+        )
+      } else {
+        setError(data.error || 'Impossibile inviare il link di recupero.')
+      }
+    } catch {
+      setError('Errore di connessione durante la richiesta di recupero.')
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -53,7 +83,7 @@ export default function AdminLoginPage() {
           height: 0 !important;
         }
       `}} />
-      
+
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
@@ -75,14 +105,14 @@ export default function AdminLoginPage() {
             <div className="relative">
               <Input
                 id="password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Inserisci la password"
                 required
-                disabled={loading}
+                disabled={loading || resetLoading}
                 className="w-full pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
-                style={{ 
+                style={{
                   WebkitTextSecurity: showPassword ? 'none' : 'disc'
                 } as React.CSSProperties}
                 autoFocus
@@ -92,8 +122,8 @@ export default function AdminLoginPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700 disabled:opacity-50"
-                disabled={loading}
-                aria-label={showPassword ? "Nascondi password" : "Mostra password"}
+                disabled={loading || resetLoading}
+                aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
               >
                 {showPassword ? (
                   <EyeOff className="w-5 h-5" />
@@ -111,16 +141,37 @@ export default function AdminLoginPage() {
             </div>
           )}
 
+          {resetMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-emerald-800">{resetMessage}</p>
+            </div>
+          )}
+
           <Button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || resetLoading || !password}
             className="w-full bg-primary-600 hover:bg-primary-700"
           >
             {loading ? 'Accesso in corso...' : 'Accedi'}
           </Button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 pt-5 border-t border-gray-100 text-center space-y-3">
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetLoading || loading}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-800 transition-colors disabled:opacity-50"
+          >
+            <Mail className="w-4 h-4" />
+            <span>
+              {resetLoading
+                ? 'Invio link di recupero in corso...'
+                : 'Password dimenticata? Ricevi link via email'}
+            </span>
+          </button>
+
           <p className="text-xs text-gray-500">
             Solo per il proprietario di AuRooms
           </p>

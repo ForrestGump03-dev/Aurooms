@@ -47,8 +47,9 @@ export async function POST(request: Request) {
         guests_count,
         total_amount,
         payment_status,
+        booking_status,
         special_requests
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed', $12)
       RETURNING *`,
       [
         data.booking_number || `MANUAL-${Date.now()}`,

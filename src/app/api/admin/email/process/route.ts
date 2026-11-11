@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { assertSameOrigin, isAdminRequest } from '@/lib/admin-auth'
+import { assertSameOrigin, isAdminRequest, timingSafeCompare } from '@/lib/admin-auth'
 import { processEmailQueue } from '@/lib/email'
 
 function isCronRequest(request: Request): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return false
-  return request.headers.get('authorization') === `Bearer ${secret}`
+  const authHeader = request.headers.get('authorization') || ''
+  if (!secret || !authHeader) return false
+  return timingSafeCompare(authHeader, `Bearer ${secret}`)
 }
 
 export async function GET(request: Request) {

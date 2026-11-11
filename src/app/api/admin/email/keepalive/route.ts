@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { timingSafeCompare } from '@/lib/admin-auth'
 
 async function readBrevoError(response: Response) {
   const text = await response.text().catch(() => '')
@@ -15,9 +16,9 @@ async function readBrevoError(response: Response) {
 }
 
 export async function GET(request: Request) {
-  // Verifica che sia una chiamata dal Cron di Vercel
   const secret = process.env.CRON_SECRET
-  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+  const authHeader = request.headers.get('authorization') || ''
+  if (!secret || !authHeader || !timingSafeCompare(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
 

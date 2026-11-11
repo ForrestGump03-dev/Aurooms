@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
+import { timingSafeCompare } from '@/lib/admin-auth'
 import { recordBrevoEvent } from '@/lib/email'
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.BREVO_WEBHOOK_SECRET
   if (!secret) return false
 
-  const authorization = request.headers.get('authorization')
-  const customSecret = request.headers.get('x-brevo-webhook-secret')
+  const authorization = request.headers.get('authorization') || ''
+  const customSecret = request.headers.get('x-brevo-webhook-secret') || ''
 
-  return authorization === `Bearer ${secret}` || customSecret === secret
+  return (
+    (authorization ? timingSafeCompare(authorization, `Bearer ${secret}`) : false) ||
+    (customSecret ? timingSafeCompare(customSecret, secret) : false)
+  )
 }
 
 export async function POST(request: Request) {

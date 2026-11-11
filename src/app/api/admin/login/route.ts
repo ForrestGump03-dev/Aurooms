@@ -1,35 +1,19 @@
 import { NextResponse } from 'next/server'
-import { SignJWT } from 'jose'
-import { assertSameOrigin, getAdminPassword, getSigningSecret } from '@/lib/admin-auth'
+import {
+  assertSameOrigin,
+  signAdminToken,
+  verifyAdminPassword,
+} from '@/lib/admin-auth'
+import {
+  checkPersistentRateLimit,
+  clearPersistentRateLimit,
+  getClientIp,
+} from '@/lib/rate-limit'
 
-const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
-
-const RATE_LIMIT = {
+const LOGIN_RATE_LIMIT = {
   maxAttempts: 5,
   windowMs: 15 * 60 * 1000,
   blockDurationMs: 60 * 60 * 1000,
-}
-
-function checkRateLimit(ip: string): { allowed: boolean; remainingAttempts?: number } {
-  const now = Date.now()
-  const attempts = loginAttempts.get(ip)
-
-  if (!attempts || now - attempts.lastAttempt > RATE_LIMIT.windowMs) {
-    loginAttempts.set(ip, { count: 1, lastAttempt: now })
-    return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - 1 }
-  }
-
-  if (attempts.count >= RATE_LIMIT.maxAttempts) {
-    if (now - attempts.lastAttempt < RATE_LIMIT.blockDurationMs) {
-      return { allowed: false }
-    }
-    loginAttempts.set(ip, { count: 1, lastAttempt: now })
-    return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - 1 }
-  }
-
-  attempts.count++
-  attempts.lastAttempt = now
-  return { allowed: true, remainingAttempts: RATE_LIMIT.maxAttempts - attempts.count }
 }
 
 export async function POST(request: Request) {
@@ -38,25 +22,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Origine richiesta non valida' }, { status: 403 })
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      'unknown'
+    const ip = getClientIp(request)
+    const rateKey = `login:${ip}`
 
-    const rateLimitCheck = checkRateLimit(ip)
+    const rateLimitCheck = await checkPersistentRateLimit(rateKey, LOGIN_RATE_LIMIT)
     if (!rateLimitCheck.allowed) {
       return NextResponse.json(
-        { error: 'Troppi tentativi. Riprova tra 1 ora.' },
+        { error: 'Troppi tentativi falliti. Riprova tra 1 ora o usa il recupero password via email.' },
         { status: 429 }
       )
     }
 
-    const { password } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const password = typeof body?.password === 'string' ? body.password : ''
 
     if (!password) {
       return NextResponse.json({ error: 'Password richiesta' }, { status: 400 })
     }
 
-    if (password !== getAdminPassword()) {
+    const { valid, sessionVersion } = await verifyAdminPassword(password)
+
+    if (!valid) {
       return NextResponse.json(
         {
           error: 'Password errata',
@@ -66,11 +52,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const token = await new SignJWT({ admin: true })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('24h')
-      .sign(getSigningSecret())
+    const token = await signAdminToken(sessionVersion)
 
     const response = NextResponse.json({ success: true })
     response.cookies.set('admin-token', token, {
@@ -81,7 +63,7 @@ export async function POST(request: Request) {
       path: '/',
     })
 
-    loginAttempts.delete(ip)
+    await clearPersistentRateLimit(rateKey)
     return response
   } catch (error) {
     console.error('Login error:', error)

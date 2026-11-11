@@ -1,14 +1,31 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyAdminToken } from '@/lib/admin-auth'
+import { jwtVerify } from 'jose'
+
+async function verifyAdminTokenEdge(token?: string): Promise<boolean> {
+  if (!token) return false
+  const secret = process.env.JWT_SECRET
+  if (!secret || secret === 'your-secret-key-change-in-production' || secret === 'your-secret-key') {
+    return false
+  }
+  try {
+    await jwtVerify(token, new TextEncoder().encode(secret))
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   const token = request.cookies.get('admin-token')?.value
-  const isAdmin = token ? await verifyAdminToken(token) : false
+  const isAdmin = token ? await verifyAdminTokenEdge(token) : false
 
-  // 1. Protect Admin routes (except /admin/login)
-  if (path.startsWith('/admin') && !path.startsWith('/admin/login')) {
+  // 1. Protect Admin routes (except /admin/login and /admin/reset-password)
+  const isPublicAdminAuthPage =
+    path.startsWith('/admin/login') || path.startsWith('/admin/reset-password')
+
+  if (path.startsWith('/admin') && !isPublicAdminAuthPage) {
     if (!isAdmin) {
       const response = NextResponse.redirect(new URL('/admin/login', request.url))
       response.cookies.delete('admin-token')
@@ -17,37 +34,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 2. Immediate env-level maintenance override (fast edge rejection)
-  const isEnvMaintenance = process.env.MAINTENANCE_MODE?.toLowerCase().trim() === 'true' ||
-                           process.env.MAINTENANCE_MODE === '1'
-
-  if (isEnvMaintenance && !isAdmin) {
-    const isExemptedPath =
-      path.startsWith('/admin') ||
-      path.startsWith('/api/admin') ||
-      path.startsWith('/api/webhooks')
-
-    if (!isExemptedPath) {
-      if (path.startsWith('/api/')) {
-        return NextResponse.json(
-          {
-            error: 'Service temporarily under maintenance. Please try again later.',
-            maintenance: true,
-          },
-          {
-            status: 503,
-            headers: {
-              'Retry-After': '3600',
-              'Cache-Control': 'no-store, no-cache, must-revalidate',
-            },
-          }
-        )
-      }
-    }
-  }
-
+  // 2. Strip any client-spoofed internal headers before forwarding
   const requestHeaders = new Headers(request.headers)
+  requestHeaders.delete('x-is-admin')
+  requestHeaders.delete('x-pathname')
   requestHeaders.set('x-pathname', path)
+
   if (isAdmin) {
     requestHeaders.set('x-is-admin', '1')
   }

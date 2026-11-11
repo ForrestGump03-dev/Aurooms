@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { query } from './db'
 
 export interface SiteSettings {
@@ -52,6 +54,66 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   maintenanceMessage: '',
 }
 
+function parseMaintenanceValue(raw?: string | null): 'true' | 'false' | null {
+  if (!raw) return null
+  const normalized = raw.toLowerCase().trim().replace(/^["']|["']$/g, '')
+  if (normalized === 'true' || normalized === '1') return 'true'
+  if (normalized === 'false' || normalized === '0') return 'false'
+  return null
+}
+
+/**
+ * Reads the current `MAINTENANCE_MODE` from `.env` on disk (in local dev for instant hot-reload)
+ * or falls back to `process.env.MAINTENANCE_MODE` (in production/Vercel).
+ */
+export function readCurrentEnvMaintenance(): 'true' | 'false' | null {
+  try {
+    const envPath = path.join(process.cwd(), '.env')
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8')
+      const match = content.match(/^\s*MAINTENANCE_MODE\s*=\s*([^\r\n#]+)/m)
+      if (match) {
+        const parsed = parseMaintenanceValue(match[1])
+        if (parsed !== null) {
+          process.env.MAINTENANCE_MODE = parsed
+          return parsed
+        }
+      }
+    }
+  } catch {
+    // Ignore filesystem errors in read-only serverless environments
+  }
+
+  return parseMaintenanceValue(process.env.MAINTENANCE_MODE)
+}
+
+/**
+ * In local development where `.env` is writable, keeps `MAINTENANCE_MODE` in `.env`
+ * aligned when the Admin toggles maintenance mode from the Dashboard.
+ */
+function syncLocalEnvFileMaintenance(enabled: boolean): void {
+  try {
+    const envPath = path.join(process.cwd(), '.env')
+    if (!fs.existsSync(envPath)) return
+
+    const content = fs.readFileSync(envPath, 'utf8')
+    const newVal = enabled ? 'true' : 'false'
+    process.env.MAINTENANCE_MODE = newVal
+
+    if (/^\s*MAINTENANCE_MODE\s*=/m.test(content)) {
+      const updated = content.replace(
+        /^(\s*MAINTENANCE_MODE\s*=\s*)([^\r\n#]*)/m,
+        `$1${newVal}`
+      )
+      if (updated !== content) {
+        fs.writeFileSync(envPath, updated, 'utf8')
+      }
+    }
+  } catch {
+    // Read-only filesystem in production (Vercel) — safe to ignore
+  }
+}
+
 function rowToSettings(row: any): SiteSettings {
   return {
     businessName: row.business_name,
@@ -84,7 +146,30 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   try {
     const result = await query('SELECT * FROM site_settings WHERE id = 1')
     if (!result.rows.length) return DEFAULT_SITE_SETTINGS
-    return rowToSettings(result.rows[0])
+
+    let row = result.rows[0]
+    const currentEnvVal = readCurrentEnvMaintenance()
+    const lastSeenEnvVal = row.last_seen_env_maintenance ?? null
+
+    // "Last Update Wins": if MAINTENANCE_MODE in env changed compared to what was last seen,
+    // apply the new env state into the database and update last_seen_env_maintenance.
+    if (currentEnvVal !== null && currentEnvVal !== lastSeenEnvVal) {
+      const envMaintenanceBool = currentEnvVal === 'true'
+      const syncResult = await query(
+        `UPDATE site_settings
+         SET maintenance_mode = $1,
+             last_seen_env_maintenance = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = 1
+         RETURNING *`,
+        [envMaintenanceBool, currentEnvVal]
+      )
+      if (syncResult.rows.length) {
+        row = syncResult.rows[0]
+      }
+    }
+
+    return rowToSettings(row)
   } catch (error) {
     console.error('Failed to load site settings:', error)
     return DEFAULT_SITE_SETTINGS
@@ -177,15 +262,19 @@ export function validateSiteSettingsPayload(input: any): { settings?: SiteSettin
 }
 
 export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSettings> {
+  // Sync local .env file if writable so local dev and panel stay aligned
+  syncLocalEnvFileMaintenance(settings.maintenanceMode)
+  const currentEnvVal = readCurrentEnvMaintenance()
+
   const result = await query(
     `INSERT INTO site_settings (
        id, business_name, short_name, tagline, description, address_line, postal_code,
        city, province, country, phone_display, phone_href, whatsapp_number, whatsapp_url,
        email, maps_url, airport_distance_label, website_url, instagram_url, facebook_url,
-       check_in_time, check_out_time, maintenance_mode, maintenance_message, updated_at
+       check_in_time, check_out_time, maintenance_mode, maintenance_message, last_seen_env_maintenance, updated_at
      ) VALUES (
        1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-       $17, $18, $19, $20, $21, $22, $23, CURRENT_TIMESTAMP
+       $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP
      )
      ON CONFLICT (id) DO UPDATE SET
        business_name = EXCLUDED.business_name,
@@ -211,6 +300,7 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSett
        check_out_time = EXCLUDED.check_out_time,
        maintenance_mode = EXCLUDED.maintenance_mode,
        maintenance_message = EXCLUDED.maintenance_message,
+       last_seen_env_maintenance = EXCLUDED.last_seen_env_maintenance,
        updated_at = CURRENT_TIMESTAMP
      RETURNING *`,
     [
@@ -237,6 +327,7 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSett
       settings.checkOutTime,
       settings.maintenanceMode,
       settings.maintenanceMessage || null,
+      currentEnvVal,
     ]
   )
 

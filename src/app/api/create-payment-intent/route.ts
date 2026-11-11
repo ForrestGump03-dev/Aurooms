@@ -3,6 +3,13 @@ import { getStripe } from '@/lib/stripe'
 import { query } from '@/lib/db'
 import { generateBookingNumber } from '@/lib/utils'
 import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/maintenance'
+import { checkPersistentRateLimit, getClientIp } from '@/lib/rate-limit'
+
+const PAYMENT_INTENT_RATE_LIMIT = {
+  maxAttempts: 10,
+  windowMs: 15 * 60 * 1000,
+  blockDurationMs: 30 * 60 * 1000,
+}
 
 function calculateNightsStrict(checkIn: string, checkOut: string): number {
   const start = new Date(`${checkIn}T00:00:00Z`)
@@ -21,6 +28,18 @@ export async function POST(request: NextRequest) {
       return getMaintenanceApiResponse()
     }
 
+    const ip = getClientIp(request)
+    const rateCheck = await checkPersistentRateLimit(
+      `payment-intent:${ip}`,
+      PAYMENT_INTENT_RATE_LIMIT
+    )
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Troppi tentativi di pagamento ravvicinati. Riprova tra qualche minuto.' },
+        { status: 429 }
+      )
+    }
+
     const { booking } = await request.json()
 
     if (!booking || !isDateString(booking.checkIn) || !isDateString(booking.checkOut)) {
@@ -34,6 +53,15 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(roomId) || roomId <= 0 || !Number.isInteger(guestsCount) || guestsCount < 1 || nights < 1) {
       return NextResponse.json({ error: 'Dati prenotazione non validi' }, { status: 400 })
     }
+
+    // Release expired unpaid holds (> 20 minutes old)
+    await query(
+      `UPDATE bookings
+       SET booking_status = 'expired', updated_at = CURRENT_TIMESTAMP
+       WHERE booking_status = 'pending'
+         AND payment_status = 'pending'
+         AND created_at <= CURRENT_TIMESTAMP - INTERVAL '20 minutes'`
+    )
 
     const roomResult = await query(
       `SELECT id, name, type, price_per_night, max_guests
@@ -54,7 +82,10 @@ export async function POST(request: NextRequest) {
     const overlap = await query(
       `SELECT COUNT(*) as count FROM bookings
        WHERE room_id = $1
-       AND booking_status IN ('confirmed', 'pending')
+       AND (
+         booking_status = 'confirmed'
+         OR (booking_status = 'pending' AND payment_status = 'pending' AND created_at > CURRENT_TIMESTAMP - INTERVAL '20 minutes')
+       )
        AND (
          (check_in <= $2 AND check_out > $2) OR
          (check_in < $3 AND check_out >= $3) OR
@@ -91,8 +122,8 @@ export async function POST(request: NextRequest) {
       `INSERT INTO bookings (
         booking_number, guest_name, guest_email, guest_phone,
         check_in, check_out, guests_count, room_type, room_id,
-        total_amount, stripe_payment_intent_id, special_requests
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        total_amount, stripe_payment_intent_id, payment_status, booking_status, special_requests
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', 'pending', $12)`,
       [
         bookingNumber,
         String(booking.guestName || '').trim(),

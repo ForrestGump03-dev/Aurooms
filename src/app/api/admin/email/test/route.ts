@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { timingSafeCompare } from '@/lib/admin-auth'
 import { enqueueBookingEmail, processEmailQueue, type EmailTemplateKey } from '@/lib/email'
 import { query } from '@/lib/db'
 
@@ -13,8 +14,9 @@ const templates: EmailTemplateKey[] = [
 
 function isCronRequest(request: Request): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return false
-  return request.headers.get('authorization') === `Bearer ${secret}`
+  const authHeader = request.headers.get('authorization') || ''
+  if (!secret || !authHeader) return false
+  return timingSafeCompare(authHeader, `Bearer ${secret}`)
 }
 
 function isEmail(value: string) {

@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
 
       const result = await query(
         `UPDATE bookings
-         SET payment_status = $1, updated_at = CURRENT_TIMESTAMP
+         SET payment_status = $1,
+             booking_status = 'confirmed',
+             updated_at = CURRENT_TIMESTAMP
          WHERE stripe_payment_intent_id = $2
            AND payment_status <> $1
          RETURNING *`,
@@ -72,7 +74,9 @@ export async function POST(request: NextRequest) {
 
       const result = await query(
         `UPDATE bookings
-         SET payment_status = $1, updated_at = CURRENT_TIMESTAMP
+         SET payment_status = $1,
+             booking_status = 'cancelled',
+             updated_at = CURRENT_TIMESTAMP
          WHERE stripe_payment_intent_id = $2
            AND payment_status <> $1
          RETURNING *`,

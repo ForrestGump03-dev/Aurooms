@@ -420,3 +420,131 @@ export async function recordBrevoEvent(payload: Record<string, unknown>) {
     ]
   )
 }
+
+
+export async function getAdminRecipientEmail(): Promise<string> {
+  const settings = await getSiteSettings()
+  const envAdminEmail = process.env.ADMIN_EMAIL?.trim()
+  return envAdminEmail || settings.email || 'info@aurooms.it'
+}
+
+export async function sendAdminPasswordResetEmail(resetUrl: string): Promise<void> {
+  const settings = await getSiteSettings()
+  const recipientEmail = await getAdminRecipientEmail()
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'prenotazioni@aurooms.it'
+  const senderName = process.env.BREVO_SENDER_NAME || settings.shortName
+  const siteUrl = settings.websiteUrl.replace(/\/$/, '')
+  const logoUrl = `${siteUrl}/logo_aurooms.png`
+
+  const htmlContent = `
+    <div style="margin: 0; padding: 0; background: #f7f3ea; font-family: Arial, Helvetica, sans-serif; color: #111827;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 28px 12px;">
+        <div style="background: #111827; border-radius: 10px 10px 0 0; overflow: hidden; text-align: center; padding: 26px;">
+          <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(settings.shortName)}" width="84" style="display: block; width: 84px; margin: 0 auto 12px; border-radius: 999px;">
+          <div style="font-family: Georgia, serif; color: #ffffff; font-size: 24px; font-weight: bold;">
+            ${escapeHtml(settings.shortName)} &middot; Sicurezza Admin
+          </div>
+        </div>
+        <div style="background: #ffffff; padding: 32px 28px; border: 1px solid #eadfcb; border-top: none; border-radius: 0 0 10px 10px;">
+          <h2 style="font-family: Georgia, serif; color: #111827; font-size: 22px; margin: 0 0 16px;">
+            Reimpostazione Password Amministratore
+          </h2>
+          <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 20px;">
+            È stata richiesta la reimpostazione della password per il Pannello di Amministrazione di <strong>${escapeHtml(settings.businessName)}</strong>.
+          </p>
+          <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 24px;">
+            Clicca sul pulsante qui sotto per scegliere una nuova password segreta (il link è monouso e scade tra <strong>20 minuti</strong>):
+          </p>
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${escapeHtml(resetUrl)}" style="display: inline-block; background: #d97706; color: #ffffff; font-weight: bold; font-size: 15px; padding: 14px 28px; border-radius: 8px; text-decoration: none;">
+              Imposta Nuova Password
+            </a>
+          </div>
+          <p style="font-size: 12px; line-height: 1.5; color: #6b7280; word-break: break-all; margin: 20px 0 0;">
+            Se il pulsante non funziona, copia e incolla questo link nel browser:<br>
+            <a href="${escapeHtml(resetUrl)}" style="color: #d97706;">${escapeHtml(resetUrl)}</a>
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+          <p style="font-size: 12px; color: #6b7280; margin: 0;">
+            Se non hai richiesto tu questa operazione, puoi ignorare questa email in tutta sicurezza: la tua password attuale non verrà modificata.
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': getBrevoApiKey(),
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: recipientEmail, name: 'Admin AuRooms' }],
+      subject: `[Sicurezza] Reimposta la password Admin - ${settings.shortName}`,
+      htmlContent,
+      tags: ['admin_password_reset'],
+    }),
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    const message = typeof data?.message === 'string' ? data.message : `Brevo API error ${response.status}`
+    throw new Error(message)
+  }
+}
+
+export async function sendAdminPasswordChangedEmail(): Promise<void> {
+  const settings = await getSiteSettings()
+  const recipientEmail = await getAdminRecipientEmail()
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'prenotazioni@aurooms.it'
+  const senderName = process.env.BREVO_SENDER_NAME || settings.shortName
+  const siteUrl = settings.websiteUrl.replace(/\/$/, '')
+  const timestamp = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+
+  const htmlContent = `
+    <div style="margin: 0; padding: 0; background: #f7f3ea; font-family: Arial, Helvetica, sans-serif; color: #111827;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 28px 12px;">
+        <div style="background: #111827; border-radius: 10px 10px 0 0; text-align: center; padding: 24px;">
+          <div style="font-family: Georgia, serif; color: #ffffff; font-size: 22px; font-weight: bold;">
+            ${escapeHtml(settings.shortName)} &middot; Avviso di Sicurezza
+          </div>
+        </div>
+        <div style="background: #ffffff; padding: 30px 28px; border: 1px solid #eadfcb; border-top: none; border-radius: 0 0 10px 10px;">
+          <h2 style="font-family: Georgia, serif; color: #111827; font-size: 20px; margin: 0 0 14px;">
+            Password Amministratore Aggiornata
+          </h2>
+          <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 16px;">
+            Ti confermiamo che la password di accesso al Pannello Admin di <strong>${escapeHtml(settings.businessName)}</strong> è stata aggiornata con successo in data <strong>${escapeHtml(timestamp)}</strong>.
+          </p>
+          <div style="background: #fef7ed; border-left: 4px solid #d97706; padding: 14px; font-size: 13px; color: #92400e; margin: 0 0 20px;">
+            Per la tua sicurezza, tutte le sessioni precedentemente aperte su altri dispositivi o browser sono state disconnesse automaticamente.
+          </div>
+          <p style="font-size: 13px; color: #6b7280; margin: 0;">
+            Se non riconosci questa attività, accedi subito a <a href="${escapeHtml(siteUrl)}/admin/login" style="color: #d97706; font-weight: bold;">${escapeHtml(siteUrl)}/admin/login</a> e clicca su "Password dimenticata" per bloccare l'accesso.
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+
+  await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': getBrevoApiKey(),
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: recipientEmail, name: 'Admin AuRooms' }],
+      subject: `[Avviso di Sicurezza] Password Admin modificata - ${settings.shortName}`,
+      htmlContent,
+      tags: ['admin_password_changed'],
+    }),
+  }).catch(err => {
+    console.error('Non-critical error sending password changed alert email:', err)
+  })
+}

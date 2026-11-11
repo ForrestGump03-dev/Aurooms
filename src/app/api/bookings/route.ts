@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
       `INSERT INTO bookings (
         booking_number, guest_name, guest_email, guest_phone,
         check_in, check_out, guests_count, room_type, room_id,
-        total_amount, special_requests
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        total_amount, booking_status, special_requests
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', $11) RETURNING *`,
       [
         booking.bookingNumber,
         booking.guestName,

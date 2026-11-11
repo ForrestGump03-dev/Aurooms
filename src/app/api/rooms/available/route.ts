@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { mapRoomRow } from '@/lib/rooms'
+import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/maintenance'
 
 // GET /api/rooms/available?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=N
 export async function GET(request: NextRequest) {
+  if (await shouldBlockApiForMaintenance(request)) {
+    return getMaintenanceApiResponse()
+  }
+
   const searchParams = request.nextUrl.searchParams
   const checkIn = searchParams.get('checkIn')
   const checkOut = searchParams.get('checkOut')
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     // Parse guests count
     const guestsCount = guests ? parseInt(guests) : 1
-    
+
     // Get all rooms
     const allRooms = await query(
       `SELECT id, name, type, description, price_per_night, max_guests, 
@@ -28,18 +33,21 @@ export async function GET(request: NextRequest) {
 
     // Check availability for each room
     const availableRooms = []
-    
+
     for (const room of allRooms.rows) {
       // First check capacity - skip if not enough
       if (room.max_guests < guestsCount) {
         continue
       }
-      
-      // Check if room is booked in the requested period
+
+      // Check if room is booked in the requested period (confirmed or active 20-min checkout hold)
       const bookings = await query(
         `SELECT COUNT(*) as count FROM bookings 
          WHERE room_id = $1 
-         AND booking_status IN ('confirmed', 'pending')
+         AND (
+           booking_status = 'confirmed'
+           OR (booking_status = 'pending' AND payment_status = 'pending' AND created_at > CURRENT_TIMESTAMP - INTERVAL '20 minutes')
+         )
          AND (
            (check_in <= $2 AND check_out > $2) OR
            (check_in < $3 AND check_out >= $3) OR
@@ -48,8 +56,8 @@ export async function GET(request: NextRequest) {
         [room.id, checkIn, checkOut]
       )
 
-      const isBooked = bookings.rows[0].count > 0
-      
+      const isBooked = Number(bookings.rows[0].count) > 0
+
       if (!isBooked) {
         availableRooms.push({
           ...mapRoomRow({ ...room, available: true }),
@@ -64,7 +72,10 @@ export async function GET(request: NextRequest) {
         `SELECT MIN(check_out) as next_date 
          FROM bookings 
          WHERE check_out > $1 
-         AND booking_status IN ('confirmed', 'pending')`,
+         AND (
+           booking_status = 'confirmed'
+           OR (booking_status = 'pending' AND payment_status = 'pending' AND created_at > CURRENT_TIMESTAMP - INTERVAL '20 minutes')
+         )`,
         [checkOut]
       )
 

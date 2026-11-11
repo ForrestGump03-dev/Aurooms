@@ -11,12 +11,14 @@ import {
   Download,
   Eye,
   Globe,
+  KeyRound,
   LogOut,
   Plus,
   RefreshCw,
   Save,
   Search,
   Settings,
+  ShieldCheck,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -101,6 +103,14 @@ export default function AdminDashboard() {
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
   const [roomForm, setRoomForm] = useState(emptyRoomForm)
   const [settingsForm, setSettingsForm] = useState<SiteSettings | null>(null)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
   const [stats, setStats] = useState<AdminStats>({
     totalBookings: 0,
     totalRevenue: 0,
@@ -270,6 +280,13 @@ export default function AdminDashboard() {
     return outputArray
   }
 
+  const escapeCsvCell = (value: unknown): string => {
+    const raw = String(value ?? '').replace(/\r?\n/g, ' ').trim()
+    // Prevent CSV Formula Injection in Excel/Sheets
+    const neutralized = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+    return `"${neutralized.replace(/"/g, '""')}"`
+  }
+
   const exportToCSV = () => {
     const headers = ['Booking Number', 'Nome', 'Email', 'Telefono', 'Camera', 'Check-in', 'Check-out', 'Ospiti', 'Totale']
     const rows = filteredBookings.map(booking => [
@@ -284,8 +301,10 @@ export default function AdminDashboard() {
       booking.total_amount,
     ])
 
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const csv = [headers, ...rows]
+      .map(row => row.map(escapeCsvCell).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -376,6 +395,49 @@ export default function AdminDashboard() {
       alert('Impostazioni salvate con successo')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (passwordForm.newPassword.length < 10) {
+      setPasswordError('La nuova password deve contenere almeno 10 caratteri.')
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('La nuova password e la conferma non coincidono.')
+      return
+    }
+
+    setPasswordSaving(true)
+    try {
+      const response = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        setPasswordError(data.error || 'Errore durante l\'aggiornamento della password')
+        return
+      }
+
+      setPasswordSuccess(
+        data.message || 'Password aggiornata con successo e salvata in formato crittografato.'
+      )
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch {
+      setPasswordError('Errore di connessione durante il cambio password.')
+    } finally {
+      setPasswordSaving(false)
     }
   }
 
@@ -842,6 +904,101 @@ export default function AdminDashboard() {
                     <Button type="submit" disabled={saving} className="flex items-center gap-2">
                       <Save className="w-4 h-4" />
                       {saving ? 'Salvataggio...' : 'Salva impostazioni'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Admin Security & Password Card */}
+            <Card className="border border-gray-200">
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-primary-600" />
+                    <CardTitle className="text-lg">Sicurezza e Password Admin</CardTitle>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Crittografia Scrypt + Disconnessione Sessioni
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600 mb-4">
+                  Aggiorna la tua password personale di amministrazione. La nuova password viene salvata solo come hash crittografico irreversibile nel database (nessuno, nemmeno lo sviluppatore, può leggerla) e disconnette automaticamente eventuali altri dispositivi collegati.
+                </p>
+
+                <form onSubmit={handleChangePassword} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Password Attuale
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="Password attuale"
+                      value={passwordForm.currentPassword}
+                      onChange={event => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })}
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Nuova Password (min. 10 caratteri)
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="Nuova password segreta"
+                      value={passwordForm.newPassword}
+                      onChange={event => setPasswordForm({ ...passwordForm, newPassword: event.target.value })}
+                      required
+                      minLength={10}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Conferma Nuova Password
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="Ripeti nuova password"
+                      value={passwordForm.confirmPassword}
+                      onChange={event => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })}
+                      required
+                      minLength={10}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  {passwordError && (
+                    <div className="md:col-span-3 bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  {passwordSuccess && (
+                    <div className="md:col-span-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-md p-3">
+                      {passwordSuccess}
+                    </div>
+                  )}
+
+                  <div className="md:col-span-3 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={
+                        passwordSaving ||
+                        !passwordForm.currentPassword ||
+                        !passwordForm.newPassword ||
+                        !passwordForm.confirmPassword
+                      }
+                      className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      {passwordSaving ? 'Aggiornamento in corso...' : 'Aggiorna Password Admin'}
                     </Button>
                   </div>
                 </form>

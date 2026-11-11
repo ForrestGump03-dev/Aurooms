@@ -97,11 +97,11 @@ export default async function RootLayout({
   const headerList = await headers()
   const cookieStore = await cookies()
   const adminToken = cookieStore.get('admin-token')?.value
-  const isAdmin = headerList.get('x-is-admin') === '1' || (adminToken ? await verifyAdminToken(adminToken) : false)
+  const isAdmin = adminToken ? await verifyAdminToken(adminToken) : false
   const pathname = headerList.get('x-pathname') || ''
   const isAdminRoute = pathname.startsWith('/admin')
   const isMaintenance = await isMaintenanceActive(settings)
-  const isEnvOverride = process.env.MAINTENANCE_MODE?.toLowerCase().trim() === 'true' || process.env.MAINTENANCE_MODE === '1'
+  const isEnvOverride = false
 
   // If maintenance mode is active, user is NOT admin, and is NOT visiting admin routes:
   if (isMaintenance && !isAdmin && !isAdminRoute) {

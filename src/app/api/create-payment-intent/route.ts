@@ -3,6 +3,7 @@ import { getStripe } from '@/lib/stripe'
 import { query } from '@/lib/db'
 import { generateBookingNumber } from '@/lib/utils'
 import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/maintenance'
+import { isPreviewRequest } from '@/lib/admin-auth'
 import { checkPersistentRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const PAYMENT_INTENT_RATE_LIMIT = {
@@ -25,6 +26,11 @@ function isDateString(value: unknown): value is string {
 export async function POST(request: NextRequest) {
   try {
     if (await shouldBlockApiForMaintenance(request)) {
+      if (await isPreviewRequest(request)) {
+        return getMaintenanceApiResponse(
+          'Preview mode: online payments are temporarily disabled while the site is in maintenance.'
+        )
+      }
       return getMaintenanceApiResponse()
     }
 

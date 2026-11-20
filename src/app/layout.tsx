@@ -10,7 +10,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { getSiteSettings } from '@/lib/site-settings'
 import { isMaintenanceActive } from '@/lib/maintenance'
-import { verifyAdminToken } from '@/lib/admin-auth'
+import { PREVIEW_COOKIE_NAME, verifyAdminToken, verifyPreviewToken } from '@/lib/admin-auth'
 import { cookies, headers } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
@@ -98,13 +98,15 @@ export default async function RootLayout({
   const cookieStore = await cookies()
   const adminToken = cookieStore.get('admin-token')?.value
   const isAdmin = adminToken ? await verifyAdminToken(adminToken) : false
+  const previewToken = cookieStore.get(PREVIEW_COOKIE_NAME)?.value
+  const isPreview = !isAdmin && previewToken ? (await verifyPreviewToken(previewToken)).valid : false
   const pathname = headerList.get('x-pathname') || ''
   const isAdminRoute = pathname.startsWith('/admin')
   const isMaintenance = await isMaintenanceActive(settings)
   const isEnvOverride = false
 
-  // If maintenance mode is active, user is NOT admin, and is NOT visiting admin routes:
-  if (isMaintenance && !isAdmin && !isAdminRoute) {
+  // If maintenance mode is active, user is NOT admin, has NO valid preview session, and is NOT visiting admin routes:
+  if (isMaintenance && !isAdmin && !isPreview && !isAdminRoute) {
     return (
       <html lang="en" className="scroll-smooth">
         <head>

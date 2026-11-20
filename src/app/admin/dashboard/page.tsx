@@ -7,11 +7,14 @@ import {
   BedDouble,
   BellRing,
   Calendar,
+  Check,
+  Copy,
   DollarSign,
   Download,
   Eye,
   Globe,
   KeyRound,
+  Link2,
   LogOut,
   Plus,
   RefreshCw,
@@ -111,6 +114,11 @@ export default function AdminDashboard() {
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [previewDurationHours, setPreviewDurationHours] = useState<number>(168)
+  const [previewLink, setPreviewLink] = useState('')
+  const [previewExpiresAt, setPreviewExpiresAt] = useState('')
+  const [previewGenerating, setPreviewGenerating] = useState(false)
+  const [previewCopied, setPreviewCopied] = useState(false)
   const [stats, setStats] = useState<AdminStats>({
     totalBookings: 0,
     totalRevenue: 0,
@@ -395,6 +403,42 @@ export default function AdminDashboard() {
       alert('Impostazioni salvate con successo')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const generatePreviewLink = async () => {
+    setPreviewGenerating(true)
+    setPreviewCopied(false)
+    try {
+      const response = await fetch('/api/admin/preview-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresInHours: previewDurationHours }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        alert(data.error || 'Errore nella generazione del link di anteprima')
+        return
+      }
+
+      setPreviewLink(data.url || '')
+      setPreviewExpiresAt(data.expiresAt || '')
+    } catch {
+      alert('Errore di connessione durante la generazione del link.')
+    } finally {
+      setPreviewGenerating(false)
+    }
+  }
+
+  const copyPreviewLink = async () => {
+    if (!previewLink) return
+    try {
+      await navigator.clipboard.writeText(previewLink)
+      setPreviewCopied(true)
+      setTimeout(() => setPreviewCopied(false), 2500)
+    } catch {
+      alert('Copia automatica non riuscita. Seleziona e copia manualmente il link.')
     }
   }
 
@@ -863,6 +907,66 @@ export default function AdminDashboard() {
                       <Save className="w-4 h-4" />
                       {saving ? 'Salvataggio...' : 'Salva Stato Manutenzione'}
                     </Button>
+                  </div>
+
+                  {/* Private Client Preview Link Generator */}
+                  <div className="border-t border-amber-200/70 pt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-amber-700" />
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Link privato di anteprima (clienti)
+                      </h3>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      Genera un link temporaneo da inviare a una cliente per farle vedere l&apos;intero sito senza disattivare la manutenzione. Non dà accesso a <code>/admin</code> e mantiene bloccati i pagamenti reali.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        aria-label="Durata link anteprima"
+                        value={previewDurationHours}
+                        onChange={event => setPreviewDurationHours(Number(event.target.value))}
+                        className="h-10 px-3 rounded-md border border-gray-300 bg-white text-sm text-gray-800"
+                      >
+                        <option value={24}>Valido 24 ore</option>
+                        <option value={72}>Valido 3 giorni</option>
+                        <option value={168}>Valido 7 giorni</option>
+                      </select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={generatePreviewLink}
+                        disabled={previewGenerating}
+                        className="flex items-center gap-2 border-amber-300 bg-white hover:bg-amber-50 text-amber-900"
+                      >
+                        <Link2 className="w-4 h-4" />
+                        {previewGenerating ? 'Generazione...' : 'Genera link anteprima'}
+                      </Button>
+                    </div>
+
+                    {previewLink && (
+                      <div className="space-y-2 p-3 rounded-lg bg-white border border-amber-200">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Input value={previewLink} readOnly className="text-xs font-mono bg-gray-50" />
+                          <Button
+                            type="button"
+                            onClick={copyPreviewLink}
+                            className="flex items-center gap-2 shrink-0"
+                          >
+                            {previewCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                            {previewCopied ? 'Copiato!' : 'Copia link'}
+                          </Button>
+                        </div>
+                        {previewExpiresAt && (
+                          <p className="text-xs text-gray-500">
+                            Scade il{' '}
+                            {new Date(previewExpiresAt).toLocaleString('it-IT', {
+                              dateStyle: 'short',
+                              timeStyle: 'short',
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

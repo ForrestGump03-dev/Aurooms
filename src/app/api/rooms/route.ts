@@ -5,7 +5,7 @@ import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/m
 
 export async function GET(request: NextRequest) {
   try {
-    if (await shouldBlockApiForMaintenance(request)) {
+    if (await shouldBlockApiForMaintenance(request, { allowPreview: true })) {
       return getMaintenanceApiResponse()
     }
 
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (await shouldBlockApiForMaintenance(request)) {
+  if (await shouldBlockApiForMaintenance(request, { allowPreview: true })) {
     return getMaintenanceApiResponse()
   }
 

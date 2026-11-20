@@ -9,8 +9,8 @@ async function verifyAdminTokenEdge(token?: string): Promise<boolean> {
     return false
   }
   try {
-    await jwtVerify(token, new TextEncoder().encode(secret))
-    return true
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret))
+    return payload.admin === true
   } catch {
     return false
   }

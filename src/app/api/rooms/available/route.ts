@@ -5,7 +5,7 @@ import { getMaintenanceApiResponse, shouldBlockApiForMaintenance } from '@/lib/m
 
 // GET /api/rooms/available?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=N
 export async function GET(request: NextRequest) {
-  if (await shouldBlockApiForMaintenance(request)) {
+  if (await shouldBlockApiForMaintenance(request, { allowPreview: true })) {
     return getMaintenanceApiResponse()
   }
 

@@ -2,13 +2,24 @@ import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { query } from './db'
 
-function getJwtSecret(): Uint8Array {
+function getRawJwtSecret(): string {
   const secret = process.env.JWT_SECRET
   if (!secret || secret === 'your-secret-key-change-in-production' || secret === 'your-secret-key') {
     throw new Error('JWT_SECRET is not configured')
   }
-  return new TextEncoder().encode(secret)
+  return secret
 }
+
+function getJwtSecret(): Uint8Array {
+  return new TextEncoder().encode(getRawJwtSecret())
+}
+
+function getPreviewJwtSecret(): Uint8Array {
+  return new TextEncoder().encode(`preview-v1:${getRawJwtSecret()}`)
+}
+
+export const PREVIEW_COOKIE_NAME = 'aurooms-preview'
+export const ALLOWED_PREVIEW_HOURS = [24, 72, 168] as const
 
 export function getAdminPassword(): string {
   const password = process.env.ADMIN_PASSWORD
@@ -219,6 +230,7 @@ export async function verifyAdminToken(token?: string): Promise<boolean> {
 
   try {
     const { payload } = await jwtVerify(token, getJwtSecret())
+    if (payload.admin !== true) return false
     const state = await getAdminCredentialsState()
     const tokenVersion = typeof payload.sessionVersion === 'number' ? payload.sessionVersion : 1
     return tokenVersion === state.sessionVersion
@@ -228,11 +240,66 @@ export async function verifyAdminToken(token?: string): Promise<boolean> {
 }
 
 export function extractAdminToken(request: Request): string | undefined {
-  return request.headers.get('cookie')?.match(/admin-token=([^;]+)/)?.[1]
+  return request.headers.get('cookie')?.match(/(?:^|;\s*)admin-token=([^;]+)/)?.[1]
 }
 
 export async function isAdminRequest(request: Request): Promise<boolean> {
   return verifyAdminToken(extractAdminToken(request))
+}
+
+/**
+ * Signs a time-limited preview JWT using a domain-separated secret so visitors
+ * with a preview link can view the site in maintenance mode without admin access.
+ */
+export async function signPreviewToken(
+  expiresInHours = 168
+): Promise<{ token: string; expiresAt: string; expiresInHours: number }> {
+  const validHours = (ALLOWED_PREVIEW_HOURS as readonly number[]).includes(expiresInHours)
+    ? expiresInHours
+    : 168
+  const exp = Math.floor(Date.now() / 1000) + validHours * 3600
+
+  const token = await new SignJWT({ preview: true, purpose: 'maintenance-preview' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(exp)
+    .sign(getPreviewJwtSecret())
+
+  return {
+    token,
+    expiresAt: new Date(exp * 1000).toISOString(),
+    expiresInHours: validHours,
+  }
+}
+
+/**
+ * Verifies a maintenance-preview JWT signature, claims, and expiration.
+ */
+export async function verifyPreviewToken(token?: string): Promise<{ valid: boolean; exp?: number }> {
+  if (!token) return { valid: false }
+
+  try {
+    const { payload } = await jwtVerify(token, getPreviewJwtSecret())
+    if (
+      payload.preview === true &&
+      payload.purpose === 'maintenance-preview' &&
+      typeof payload.exp === 'number'
+    ) {
+      return { valid: true, exp: payload.exp }
+    }
+    return { valid: false }
+  } catch {
+    return { valid: false }
+  }
+}
+
+export function extractPreviewToken(request: Request): string | undefined {
+  return request.headers.get('cookie')?.match(/(?:^|;\s*)aurooms-preview=([^;]+)/)?.[1]
+}
+
+export async function isPreviewRequest(request: Request): Promise<boolean> {
+  const result = await verifyPreviewToken(extractPreviewToken(request))
+  return result.valid
 }
 
 export function getSigningSecret(): Uint8Array {

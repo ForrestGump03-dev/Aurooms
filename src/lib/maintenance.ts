@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSiteSettings, SiteSettings } from './site-settings'
-import { extractAdminToken, verifyAdminToken } from './admin-auth'
+import { extractAdminToken, isPreviewRequest, verifyAdminToken } from './admin-auth'
 
 /**
  * Checks if maintenance mode is active using the bidirectional "last update wins"
@@ -25,9 +25,13 @@ export function isMaintenanceActiveSync(settings?: SiteSettings): boolean {
 
 /**
  * Helper to check if a backend API request should be blocked.
- * Admins with a valid JWT token (and valid session_version) bypass maintenance block.
+ * Admins with a valid JWT token (and valid session_version) always bypass maintenance block.
+ * Visitors with a valid preview cookie only bypass endpoints that opt in via `{ allowPreview: true }`.
  */
-export async function shouldBlockApiForMaintenance(request: Request): Promise<boolean> {
+export async function shouldBlockApiForMaintenance(
+  request: Request,
+  options?: { allowPreview?: boolean }
+): Promise<boolean> {
   const active = await isMaintenanceActive()
   if (!active) return false
 
@@ -36,7 +40,11 @@ export async function shouldBlockApiForMaintenance(request: Request): Promise<bo
     return false // Admin has access
   }
 
-  return true // Block non-admin request
+  if (options?.allowPreview && (await isPreviewRequest(request))) {
+    return false // Client preview session has read-only site access
+  }
+
+  return true // Block request
 }
 
 /**
